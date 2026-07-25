@@ -1020,3 +1020,431 @@ code {
     width: auto;
   }
 }
+
+/* NOBORI stream package tone */
+.obs-root {
+  background: #020608;
+}
+
+.scene-background {
+  background-position: center;
+  background-size: cover;
+}
+
+.scene-background::after {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.66), rgba(0, 0, 0, 0.2) 66%, rgba(0, 0, 0, 0.06)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34), transparent 44%, rgba(0, 0, 0, 0.18));
+}
+
+.scene-frame {
+  padding: 52px 64px 0;
+}
+
+.scene-header {
+  height: 153px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.scene-heading {
+  min-width: 0;
+}
+
+.scene-heading h1 {
+  margin: 0;
+  color: #f7f7f7;
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 90px;
+  font-weight: 950;
+  line-height: 0.9;
+}
+
+.scene-heading span {
+  display: block;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.scene-mark {
+  width: 136px;
+  height: 136px;
+  margin-top: -8px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.scene-content {
+  height: 806px;
+  padding-top: 0;
+}
+
+.nobori-panel {
+  position: relative;
+  height: 806px;
+  border: 2px solid rgba(24, 200, 204, 0.76);
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 0 28px rgba(24, 200, 204, 0.08),
+    inset 0 0 80px rgba(0, 0, 0, 0.22);
+}
+
+.map-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 300px;
+}
+
+.map-panel .map-grid {
+  height: auto;
+  padding: 42px 42px 34px;
+  align-items: stretch;
+}
+
+.maps-5 .map-panel .map-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.maps-7 .map-panel .map-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.map-panel .map-card,
+.roster-panel .roster-team,
+.ban-panel .ban-column,
+.ban-panel .selected-map-panel {
+  border: 1px solid rgba(24, 200, 204, 0.5);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: none;
+}
+
+.map-card::before {
+  border-top-color: rgba(24, 200, 204, 0.86);
+}
+
+.map-panel .map-visual {
+  height: 220px;
+  min-height: 0;
+  padding: 14px;
+}
+
+.maps-7 .map-panel .map-visual {
+  height: 190px;
+  min-height: 0;
+}
+
+.map-panel .map-visual span {
+  border-radius: 0;
+  padding: 5px 8px;
+  background: #18c8cc;
+  color: #001113;
+}
+
+.map-panel .map-fallback {
+  background:
+    linear-gradient(135deg, rgba(24, 200, 204, 0.22), transparent 48%),
+    rgba(0, 0, 0, 0.34);
+}
+
+.map-panel .map-fallback strong {
+  font-family: "Arial Black", sans-serif;
+  font-size: 54px;
+}
+
+.maps-7 .map-panel .map-fallback strong {
+  font-size: 42px;
+}
+
+.map-panel .map-card-body {
+  min-height: 140px;
+  padding: 15px;
+}
+
+.maps-7 .map-panel .map-card-body {
+  min-height: 128px;
+  padding: 12px;
+}
+
+.map-panel .map-card-body h2 {
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 25px;
+  line-height: 1.05;
+}
+
+.maps-7 .map-panel .map-card-body h2 {
+  font-size: 19px;
+}
+
+.map-panel .map-card-body span,
+.map-panel .map-meta,
+.map-panel .map-meta strong {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.map-panel .map-meta em {
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: #18c8cc;
+}
+
+.winner-ribbon {
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 0;
+  background: #18c8cc;
+  color: #001113;
+  box-shadow: none;
+}
+
+.match-strip {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px minmax(0, 1fr);
+  align-items: center;
+  border-top: 2px solid rgba(24, 200, 204, 0.76);
+  padding: 34px 150px 30px;
+}
+
+.match-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-width: 0;
+  text-align: center;
+}
+
+.match-team.left {
+  grid-column: 1;
+}
+
+.match-team.right {
+  grid-column: 3;
+}
+
+.match-logo {
+  width: 128px;
+  height: 128px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #18c8cc;
+  font-size: 32px;
+}
+
+.match-team span,
+.match-center span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.match-team strong {
+  display: block;
+  margin-top: 14px;
+  color: #fff;
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 36px;
+  font-weight: 950;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.match-center {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: #fff;
+  text-align: center;
+}
+
+.match-center strong {
+  color: #fff;
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 54px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.match-center em {
+  color: rgba(255, 255, 255, 0.82);
+  font-style: normal;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+.roster-panel {
+  padding: 70px 110px;
+}
+
+.roster-panel .roster-grid {
+  height: 100%;
+  padding: 0;
+  gap: 82px;
+}
+
+.roster-panel .roster-team {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-top: 0;
+  padding: 28px;
+}
+
+.roster-panel .roster-team-head {
+  height: auto;
+  justify-content: center;
+  text-align: center;
+}
+
+.roster-panel .roster-logo {
+  width: 104px;
+  height: 104px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #18c8cc;
+  font-size: 30px;
+}
+
+.roster-panel .roster-team h2 {
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 40px;
+}
+
+.roster-panel .player-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.roster-panel .player-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.roster-panel .player-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 0;
+  border-color: rgba(24, 200, 204, 0.5);
+  background: rgba(0, 0, 0, 0.36);
+  color: #18c8cc;
+}
+
+.roster-panel .player-card span {
+  color: #18c8cc;
+  font-size: 16px;
+}
+
+.roster-panel .player-card strong {
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 26px;
+}
+
+.ban-panel {
+  padding: 56px 74px;
+}
+
+.ban-panel .ban-layout {
+  height: 100%;
+  padding-top: 0;
+  grid-template-columns: minmax(0, 1fr) 390px minmax(0, 1fr);
+  gap: 34px;
+}
+
+.ban-panel .ban-column,
+.ban-panel .selected-map-panel {
+  padding: 28px;
+}
+
+.ban-panel .ban-column h2,
+.selected-map-panel > span {
+  color: #fff;
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 32px;
+  font-weight: 950;
+}
+
+.ban-panel .ban-list {
+  gap: 18px;
+}
+
+.ban-panel .ban-card {
+  min-height: 116px;
+  border: 0;
+  border-left: 3px solid #18c8cc;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ban-panel .hero-visual {
+  width: 92px;
+  height: 92px;
+  border-radius: 0;
+  background-color: rgba(0, 0, 0, 0.28);
+}
+
+.ban-panel .ban-card span {
+  color: #18c8cc;
+}
+
+.ban-panel .ban-card strong {
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 31px;
+}
+
+.ban-panel .selected-map-panel {
+  justify-items: center;
+  text-align: center;
+}
+
+.ban-panel .selected-map-panel .map-visual {
+  width: 100%;
+  height: 360px;
+  min-height: 360px;
+  border-radius: 0;
+  border: 1px solid rgba(24, 200, 204, 0.48);
+}
+
+.ban-panel .selected-map-panel h2 {
+  font-family:
+    "Arial Rounded MT Bold", "Arial Black", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  font-size: 38px;
+}
+
+.ban-panel .selected-map-panel > strong {
+  color: #18c8cc;
+}

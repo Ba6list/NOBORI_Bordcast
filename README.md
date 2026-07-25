@@ -19,8 +19,21 @@ Overwatch大会「NOBORI」向けのOBSブラウザソース用Webツールで�
 
 正式なNOBORIキービジュアル、チームロゴ、マップ画像、選手写真、ヒーロー画像は `public/assets` に置き、管理画面のURL欄で `/assets/file-name.png` のように指定してください。
 
-現在の仮背景:
+現在のNOBORI配信トーン背景:
 
 ```text
-/assets/nobori-kv-placeholder.png
+/assets/nobori-stream-background.png
+```
+
+右上マーク:
+
+```text
+/assets/nobori-symbol.png
+```
+
+ロゴセット:
+
+```text
+/assets/nobori-full.png
+/assets/nobori-typography.png
 ```

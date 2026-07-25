@@ -78,7 +78,9 @@ type StateBundle = {
 
 const STORAGE_KEY = "nobori-broadcast-control-v1";
 const CHANNEL_NAME = "nobori-broadcast-control";
-const PLACEHOLDER_BACKGROUND = "/assets/nobori-kv-placeholder.png";
+const LEGACY_BACKGROUND = "/assets/nobori-kv-placeholder.png";
+const PLACEHOLDER_BACKGROUND = "/assets/nobori-stream-background.png";
+const NOBORI_MARK = "/assets/nobori-symbol.png";
 const MAX_MAPS = 7;
 const PLAYERS_PER_TEAM = 6;
 const BANS_PER_STAGE = 4;
@@ -192,7 +194,7 @@ const defaultState: NoboriState = {
       seed: "SEED 1",
       score: 1,
       logoUrl: "",
-      color: "#00d7ff",
+      color: "#18c8cc",
       roster: defaultRosterLeft,
     },
     right: {
@@ -200,7 +202,7 @@ const defaultState: NoboriState = {
       seed: "SEED 2",
       score: 0,
       logoUrl: "",
-      color: "#ff4fd8",
+      color: "#18c8cc",
       roster: defaultRosterRight,
     },
   },
@@ -254,6 +256,10 @@ function normalizeState(input?: Partial<NoboriState>): NoboriState {
   const base = cloneDefaultState();
   const next = { ...base, ...(input ?? {}) };
   const inputTeams = input?.teams;
+
+  if (!next.backgroundUrl || next.backgroundUrl === LEGACY_BACKGROUND) {
+    next.backgroundUrl = PLACEHOLDER_BACKGROUND;
+  }
 
   next.teams = {
     left: {
@@ -635,7 +641,7 @@ function AdminPage() {
                         backgroundUrl: event.target.value,
                       }))
                     }
-                    placeholder="/assets/nobori-kv-placeholder.png"
+                    placeholder="/assets/nobori-stream-background.png"
                   />
                 </Field>
               </Section>
@@ -992,22 +998,6 @@ function SceneBackground({
   );
 }
 
-function TeamPlate({ state, side }: { state: NoboriState; side: Side }) {
-  const team = state.teams[side];
-  const style = { "--team-color": team.color } as CSSProperties;
-
-  return (
-    <div className={`team-plate ${side}`} style={style}>
-      <IconImage src={team.logoUrl} label={team.name} className="team-logo" />
-      <div className="team-copy">
-        <span>{team.seed}</span>
-        <strong>{team.name}</strong>
-      </div>
-      <div className="team-score">{team.score}</div>
-    </div>
-  );
-}
-
 function SceneHeader({
   state,
   label,
@@ -1017,13 +1007,13 @@ function SceneHeader({
 }) {
   return (
     <header className="scene-header">
-      <TeamPlate state={state} side="left" />
-      <div className="scene-logo">
-        <span>{state.roundName}</span>
-        <strong>NOBORI</strong>
-        <em>{label}</em>
+      <div className="scene-heading">
+        <h1>{label}</h1>
+        <span>
+          {state.matchTitle} / {state.roundName}
+        </span>
       </div>
-      <TeamPlate state={state} side="right" />
+      <img className="scene-mark" src={NOBORI_MARK} alt="" />
     </header>
   );
 }
@@ -1079,40 +1069,61 @@ function MapPickScene({ state }: { state: NoboriState }) {
 
   return (
     <section className={`scene-content map-scene maps-${maps.length}`}>
-      <div className="scene-title-row">
-        <div>
-          <span>{state.matchTitle}</span>
-          <h1>MAP PICK</h1>
+      <div className="nobori-panel map-panel">
+        <div className="map-grid">
+          {maps.map((map, index) => (
+            <article
+              className={`map-card status-${map.status} winner-${map.winner}`}
+              key={`${map.name}-${index}`}
+            >
+              <MapVisual map={map} index={index} />
+              <div className="map-card-body">
+                <span>{map.mode}</span>
+                <h2>{map.name}</h2>
+                <div className="map-meta">
+                  <em>{statusLabels[map.status]}</em>
+                  <strong>{teamName(state, map.picker)}</strong>
+                </div>
+              </div>
+              {map.winner !== "none" ? (
+                <div
+                  className="winner-ribbon"
+                  style={
+                    { "--team-color": teamColor(state, map.winner) } as CSSProperties
+                  }
+                >
+                  WIN
+                </div>
+              ) : null}
+            </article>
+          ))}
         </div>
-        <strong>
-          {state.format} / MAX {maps.length} MAPS
-        </strong>
-      </div>
-      <div className="map-grid">
-        {maps.map((map, index) => (
-          <article
-            className={`map-card status-${map.status} winner-${map.winner}`}
-            key={`${map.name}-${index}`}
-          >
-            <MapVisual map={map} index={index} />
-            <div className="map-card-body">
-              <span>{map.mode}</span>
-              <h2>{map.name}</h2>
-              <div className="map-meta">
-                <em>{statusLabels[map.status]}</em>
-                <strong>{teamName(state, map.picker)}</strong>
+        <div className="match-strip">
+          {(["left", "right"] as Side[]).map((side) => (
+            <div
+              className={`match-team ${side}`}
+              style={{ "--team-color": state.teams[side].color } as CSSProperties}
+              key={side}
+            >
+              <IconImage
+                src={state.teams[side].logoUrl}
+                label={state.teams[side].name}
+                className="match-logo"
+              />
+              <div>
+                <span>{state.teams[side].seed}</span>
+                <strong>{state.teams[side].name}</strong>
               </div>
             </div>
-            {map.winner !== "none" ? (
-              <div
-                className="winner-ribbon"
-                style={{ "--team-color": teamColor(state, map.winner) } as CSSProperties}
-              >
-                WINNER {state.teams[map.winner].name}
-              </div>
-            ) : null}
-          </article>
-        ))}
+          ))}
+          <div className="match-center">
+            <span>{state.roundName}</span>
+            <strong>{state.format}</strong>
+            <em>
+              {state.teams.left.score} - {state.teams.right.score}
+            </em>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -1121,38 +1132,33 @@ function MapPickScene({ state }: { state: NoboriState }) {
 function RosterScene({ state }: { state: NoboriState }) {
   return (
     <section className="scene-content roster-scene">
-      <div className="scene-title-row">
-        <div>
-          <span>{state.matchTitle}</span>
-          <h1>ROSTER</h1>
-        </div>
-        <strong>{state.roundName}</strong>
-      </div>
-      <div className="roster-grid">
-        {(["left", "right"] as Side[]).map((side) => (
-          <div
-            className={`roster-team ${side}`}
-            style={{ "--team-color": state.teams[side].color } as CSSProperties}
-            key={side}
-          >
-            <div className="roster-team-head">
-              <IconImage
-                src={state.teams[side].logoUrl}
-                label={state.teams[side].name}
-                className="roster-logo"
-              />
-              <div>
-                <span>{state.teams[side].seed}</span>
-                <h2>{state.teams[side].name}</h2>
+      <div className="nobori-panel roster-panel">
+        <div className="roster-grid">
+          {(["left", "right"] as Side[]).map((side) => (
+            <div
+              className={`roster-team ${side}`}
+              style={{ "--team-color": state.teams[side].color } as CSSProperties}
+              key={side}
+            >
+              <div className="roster-team-head">
+                <IconImage
+                  src={state.teams[side].logoUrl}
+                  label={state.teams[side].name}
+                  className="roster-logo"
+                />
+                <div>
+                  <span>{state.teams[side].seed}</span>
+                  <h2>{state.teams[side].name}</h2>
+                </div>
+              </div>
+              <div className="player-grid">
+                {state.teams[side].roster.map((player, index) => (
+                  <PlayerCard key={`${side}-${player.name}-${index}`} player={player} />
+                ))}
               </div>
             </div>
-            <div className="player-grid">
-              {state.teams[side].roster.map((player, index) => (
-                <PlayerCard key={`${side}-${player.name}-${index}`} player={player} />
-              ))}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -1195,22 +1201,17 @@ function BanScene({ state }: { state: NoboriState }) {
 
   return (
     <section className="scene-content ban-scene">
-      <div className="scene-title-row">
-        <div>
-          <span>{state.matchTitle}</span>
-          <h1>HERO BAN</h1>
+      <div className="nobori-panel ban-panel">
+        <div className="ban-layout">
+          <BanColumn title="INITIAL BAN" picks={state.bans.initial} state={state} />
+          <div className="selected-map-panel">
+            <span>SELECTED MAP</span>
+            <MapVisual map={selectedMap} index={state.bans.selectedMapIndex} />
+            <h2>{selectedMap.name}</h2>
+            <strong>{selectedMap.mode}</strong>
+          </div>
+          <BanColumn title="FOLLOW-UP BAN" picks={state.bans.followup} state={state} />
         </div>
-        <strong>{state.format}</strong>
-      </div>
-      <div className="ban-layout">
-        <BanColumn title="INITIAL BAN" picks={state.bans.initial} state={state} />
-        <div className="selected-map-panel">
-          <span>SELECTED MAP</span>
-          <MapVisual map={selectedMap} index={state.bans.selectedMapIndex} />
-          <h2>{selectedMap.name}</h2>
-          <strong>{selectedMap.mode}</strong>
-        </div>
-        <BanColumn title="FOLLOW-UP BAN" picks={state.bans.followup} state={state} />
       </div>
     </section>
   );
