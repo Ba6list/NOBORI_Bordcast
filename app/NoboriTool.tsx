@@ -836,23 +836,40 @@ function normalizeState(input?: Partial<NoboriState>): NoboriState {
   return next as NoboriState;
 }
 
+function serializeState(state: NoboriState) {
+  return JSON.stringify(normalizeState(state));
+}
+
 function useNoboriState(): StateBundle {
   const [state, setInternalState] = useState<NoboriState>(() =>
     cloneDefaultState(),
   );
   const [ready, setReady] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const lastSerializedRef = useRef("");
   const sourceId = useId();
+
+  const applyIncomingState = useCallback((incoming: unknown) => {
+    const normalized = normalizeState(incoming as Partial<NoboriState>);
+    const serialized = serializeState(normalized);
+
+    if (serialized === lastSerializedRef.current) return;
+
+    lastSerializedRef.current = serialized;
+    setInternalState(normalized);
+  }, []);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
       try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          setInternalState(normalizeState(JSON.parse(stored)));
+          applyIncomingState(JSON.parse(stored));
         }
       } catch {
-        setInternalState(cloneDefaultState());
+        const reset = cloneDefaultState();
+        lastSerializedRef.current = serializeState(reset);
+        setInternalState(reset);
       } finally {
         setReady(true);
       }
@@ -868,10 +885,12 @@ function useNoboriState(): StateBundle {
       nextChannel.onmessage = (event: MessageEvent) => {
         if (event.data?.source === sourceId) return;
         if (event.data?.type === "state") {
-          setInternalState(normalizeState(event.data.state));
+          applyIncomingState(event.data.state);
         }
         if (event.data?.type === "reset") {
-          setInternalState(cloneDefaultState());
+          const reset = cloneDefaultState();
+          lastSerializedRef.current = serializeState(reset);
+          setInternalState(reset);
         }
       };
     }
@@ -879,9 +898,11 @@ function useNoboriState(): StateBundle {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== STORAGE_KEY || !event.newValue) return;
       try {
-        setInternalState(normalizeState(JSON.parse(event.newValue)));
+        applyIncomingState(JSON.parse(event.newValue));
       } catch {
-        setInternalState(cloneDefaultState());
+        const reset = cloneDefaultState();
+        lastSerializedRef.current = serializeState(reset);
+        setInternalState(reset);
       }
     };
 
@@ -893,12 +914,23 @@ function useNoboriState(): StateBundle {
       channelRef.current = null;
       window.removeEventListener("storage", onStorage);
     };
-  }, [sourceId]);
+  }, [applyIncomingState, sourceId]);
 
   useEffect(() => {
     if (!ready) return;
     const normalized = normalizeState(state);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    const serialized = serializeState(normalized);
+
+    if (serialized === lastSerializedRef.current) return;
+
+    lastSerializedRef.current = serialized;
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, serialized);
+    } catch {
+      // OBSや一部ブラウザ環境で保存が拒否されても画面操作は止めない。
+    }
+
     channelRef.current?.postMessage({
       type: "state",
       source: sourceId,
@@ -918,8 +950,17 @@ function useNoboriState(): StateBundle {
 
   const resetState = useCallback(() => {
     const reset = cloneDefaultState();
+    const serialized = serializeState(reset);
+
+    lastSerializedRef.current = serialized;
     setInternalState(reset);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, serialized);
+    } catch {
+      // 保存できない環境でもリセット表示自体は反映する。
+    }
+
     channelRef.current?.postMessage({
       type: "reset",
       source: sourceId,
