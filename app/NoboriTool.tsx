@@ -327,6 +327,12 @@ function heroImageForName(heroName: string) {
   return findHeroPreset(heroName)?.imageUrl ?? "";
 }
 
+function heroCropClass(heroName: string, imageUrl = "") {
+  const hero = findHeroPreset(heroName) ?? findHeroPresetByImageUrl(imageUrl);
+
+  return hero?.name === "Wrecking Ball" ? "hero-crop-full" : "hero-crop-upper";
+}
+
 const mapPool: { mode: string; maps: MapPoolEntry[] }[] = [
   {
     mode: "Control",
@@ -1959,7 +1965,12 @@ function MapVisual({
 
 function PlayerCard({ player }: { player: Player }) {
   return (
-    <article className={`player-card role-${player.role.toLowerCase()}`}>
+    <article
+      className={`player-card role-${player.role.toLowerCase()} ${heroCropClass(
+        player.favoriteHero,
+        player.imageUrl,
+      )}`}
+    >
       <IconImage src={player.imageUrl} label={player.name} className="player-photo" />
       <div>
         <span>{roleLabels[player.role]}</span>
@@ -2140,7 +2151,11 @@ function BanHeroPane({
       >
         <span className="ban-phase-badge">{banPhaseLabels[phase]}</span>
         {heroImage ? (
-          <img className="ban-hero-fullbody" src={heroImage} alt="" />
+          <img
+            className={`ban-hero-fullbody ${heroCropClass(heroName, heroImage)}`}
+            src={heroImage}
+            alt=""
+          />
         ) : (
           <strong>{hasBan ? initials(heroName) : "NB"}</strong>
         )}
