@@ -31,6 +31,12 @@ type LogoAdjust = {
   offsetY: number;
 };
 
+type HeroAdjust = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
 type Team = {
   name: string;
   seed: string;
@@ -62,6 +68,7 @@ type BanPick = {
   heroName: string;
   heroImageUrl: string;
   team: Side;
+  heroAdjust: HeroAdjust;
 };
 
 type MapBanSet = Record<BanPhase, BanPick>;
@@ -121,6 +128,11 @@ const TEAM_LOGO_DIR = "/assets/team-logos";
 const HERO_IMAGE_DIR = "/assets/heroes";
 const MAP_IMAGE_DIR = "/assets/maps";
 const DEFAULT_LOGO_ADJUST: LogoAdjust = {
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0,
+};
+const DEFAULT_HERO_ADJUST: HeroAdjust = {
   scale: 1,
   offsetX: 0,
   offsetY: 0,
@@ -534,7 +546,12 @@ function oppositeSide(side: Side): Side {
 }
 
 function makeBanPick(team: Side, heroName = "", heroImageUrl = ""): BanPick {
-  return { heroName, heroImageUrl: heroImageUrl || heroImageForName(heroName), team };
+  return {
+    heroName,
+    heroImageUrl: heroImageUrl || heroImageForName(heroName),
+    team,
+    heroAdjust: { ...DEFAULT_HERO_ADJUST },
+  };
 }
 
 function makeMapBanSet(
@@ -692,6 +709,7 @@ function normalizeBanPick(
     heroName,
     heroImageUrl: inputImageUrl || heroImageForName(heroName) || fallback.heroImageUrl,
     team,
+    heroAdjust: normalizeHeroAdjust(value.heroAdjust ?? fallback.heroAdjust),
   };
 }
 
@@ -803,6 +821,14 @@ function normalizeLogoAdjust(input?: Partial<LogoAdjust>): LogoAdjust {
     scale: safeRangeNumber(input?.scale, DEFAULT_LOGO_ADJUST.scale, 0.4, 2.5),
     offsetX: safeRangeNumber(input?.offsetX, DEFAULT_LOGO_ADJUST.offsetX, -50, 50),
     offsetY: safeRangeNumber(input?.offsetY, DEFAULT_LOGO_ADJUST.offsetY, -50, 50),
+  };
+}
+
+function normalizeHeroAdjust(input?: Partial<HeroAdjust>): HeroAdjust {
+  return {
+    scale: safeRangeNumber(input?.scale, DEFAULT_HERO_ADJUST.scale, 0.45, 2.5),
+    offsetX: safeRangeNumber(input?.offsetX, DEFAULT_HERO_ADJUST.offsetX, -80, 80),
+    offsetY: safeRangeNumber(input?.offsetY, DEFAULT_HERO_ADJUST.offsetY, -100, 100),
   };
 }
 
@@ -1051,6 +1077,14 @@ function logoAdjustStyle(adjust: LogoAdjust): CSSProperties {
   } as CSSProperties;
 }
 
+function heroAdjustStyle(adjust: HeroAdjust): CSSProperties {
+  return {
+    "--hero-scale": adjust.scale,
+    "--hero-offset-x": `${adjust.offsetX}%`,
+    "--hero-offset-y": `${adjust.offsetY}%`,
+  } as CSSProperties;
+}
+
 function IconImage({
   src,
   label,
@@ -1210,6 +1244,33 @@ function AdminPage() {
             [phase]: {
               ...mapBanSet[phase],
               ...patch,
+            },
+          };
+        }),
+      },
+    }));
+  };
+
+  const updateBanHeroAdjust = (
+    index: number,
+    phase: BanPhase,
+    patch: Partial<HeroAdjust>,
+  ) => {
+    setState((previous) => ({
+      ...previous,
+      bans: {
+        ...previous.bans,
+        mapBans: previous.bans.mapBans.map((mapBanSet, pickIndex) => {
+          if (pickIndex !== index) return mapBanSet;
+
+          return {
+            ...mapBanSet,
+            [phase]: {
+              ...mapBanSet[phase],
+              heroAdjust: normalizeHeroAdjust({
+                ...mapBanSet[phase].heroAdjust,
+                ...patch,
+              }),
             },
           };
         }),
@@ -1831,6 +1892,7 @@ function AdminPage() {
                                     updateMapBan(index, phase, {
                                       heroName: hero?.name ?? "",
                                       heroImageUrl: hero?.imageUrl ?? "",
+                                      heroAdjust: DEFAULT_HERO_ADJUST,
                                     })
                                   }
                                 />
@@ -1844,6 +1906,69 @@ function AdminPage() {
                                   }
                                   placeholder="ヒーロー画像URL"
                                 />
+                                <div className="logo-adjust-panel hero-adjust-panel">
+                                  <div className="logo-adjust-head">
+                                    <span>表示調整</span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        updateMapBan(index, phase, {
+                                          heroAdjust: DEFAULT_HERO_ADJUST,
+                                        })
+                                      }
+                                    >
+                                      リセット
+                                    </button>
+                                  </div>
+                                  <Field
+                                    label={`倍率 ${Math.round(
+                                      pick.heroAdjust.scale * 100,
+                                    )}%`}
+                                  >
+                                    <input
+                                      type="range"
+                                      min="0.45"
+                                      max="2.5"
+                                      step="0.01"
+                                      value={pick.heroAdjust.scale}
+                                      onChange={(event) =>
+                                        updateBanHeroAdjust(index, phase, {
+                                          scale: Number(event.target.value),
+                                        })
+                                      }
+                                    />
+                                  </Field>
+                                  <div className="form-grid two">
+                                    <Field label={`横位置 ${pick.heroAdjust.offsetX}`}>
+                                      <input
+                                        type="range"
+                                        min="-80"
+                                        max="80"
+                                        step="1"
+                                        value={pick.heroAdjust.offsetX}
+                                        onChange={(event) =>
+                                          updateBanHeroAdjust(index, phase, {
+                                            offsetX: Number(event.target.value),
+                                          })
+                                        }
+                                      />
+                                    </Field>
+                                    <Field label={`縦位置 ${pick.heroAdjust.offsetY}`}>
+                                      <input
+                                        type="range"
+                                        min="-100"
+                                        max="100"
+                                        step="1"
+                                        value={pick.heroAdjust.offsetY}
+                                        onChange={(event) =>
+                                          updateBanHeroAdjust(index, phase, {
+                                            offsetY: Number(event.target.value),
+                                          })
+                                        }
+                                      />
+                                    </Field>
+                                  </div>
+                                </div>
                               </div>
                             );
                           })}
@@ -2155,6 +2280,7 @@ function BanHeroPane({
             className={`ban-hero-fullbody ${heroCropClass(heroName, heroImage)}`}
             src={heroImage}
             alt=""
+            style={heroAdjustStyle(pick.heroAdjust)}
           />
         ) : (
           <strong>{hasBan ? initials(heroName) : "NB"}</strong>

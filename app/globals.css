@@ -365,6 +365,11 @@ code {
   accent-color: var(--cyan);
 }
 
+.hero-adjust-panel {
+  gap: 9px;
+  padding: 10px;
+}
+
 .image-shell {
   --image-inset: 5px;
 
@@ -1778,6 +1783,10 @@ code {
 }
 
 .ban-hero-fullbody {
+  --hero-offset-x: 0%;
+  --hero-offset-y: 0%;
+  --hero-scale: 1;
+
   position: relative;
   z-index: 1;
   width: 100%;
@@ -1794,7 +1803,10 @@ code {
   height: 146%;
   object-fit: contain;
   object-position: center top;
-  transform: translateY(2%);
+  transform:
+    translate(var(--hero-offset-x), var(--hero-offset-y))
+    scale(var(--hero-scale));
+  transform-origin: center top;
 }
 
 .ban-hero-fullbody.hero-crop-full {
@@ -1804,7 +1816,10 @@ code {
   height: 100%;
   object-fit: contain;
   object-position: center bottom;
-  transform: none;
+  transform:
+    translate(var(--hero-offset-x), var(--hero-offset-y))
+    scale(var(--hero-scale));
+  transform-origin: center bottom;
 }
 
 .ban-phase-badge {
