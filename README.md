@@ -4,12 +4,19 @@ Overwatch大会「NOBORI」向けのOBSブラウザソース用Webツールで�
 
 ## URL
 
-- 管理画面: `http://localhost:3000/`
-- マップピック: `http://localhost:3000/obs/map`
-- ロスター紹介: `http://localhost:3000/obs/roster`
-- キャラクターBAN: `http://localhost:3000/obs/ban`
+- 管理画面: `/`
+- マップピック: `/obs/map`
+- ロスター紹介: `/obs/roster`
+- キャラクターBAN: `/obs/ban`
 
 透過で使いたい場合は、OBS側URLに `?transparent=1` を付けます。
+
+ローカル確認では起動時に表示される `http://localhost:3000/` や `http://localhost:3001/` に上記パスを付けて使います。
+
+## Vercel
+
+GitHubリポジトリをVercelにImportし、Framework PresetはNext.jsのままで公開できます。
+`vercel.json` でVercel用ビルドは `pnpm exec next build` に固定しています。
 
 ## 同期
 
