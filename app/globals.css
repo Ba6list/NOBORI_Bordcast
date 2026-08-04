@@ -1310,7 +1310,7 @@ code {
 
 .map-winner-badge {
   --winner-logo-width: 104px;
-  --winner-logo-height: 52px;
+  --winner-logo-height: 104px;
   --winner-label-gap: 10px;
 
   position: absolute;
@@ -1362,7 +1362,7 @@ code {
 
 .maps-7 .map-winner-badge {
   --winner-logo-width: 82px;
-  --winner-logo-height: 42px;
+  --winner-logo-height: 82px;
 
   top: 14px;
   left: 14px;
