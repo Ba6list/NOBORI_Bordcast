@@ -1315,7 +1315,7 @@ code {
   z-index: 3;
   display: grid;
   justify-items: center;
-  gap: 4px;
+  gap: 0;
   width: 104px;
   opacity: 0.72;
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.82));
@@ -1327,6 +1327,7 @@ code {
   font-size: 16px;
   font-weight: 950;
   line-height: 1;
+  margin-top: -14px;
   text-shadow: 0 0 10px rgba(23, 189, 193, 0.62);
 }
 
@@ -1334,7 +1335,7 @@ code {
   --image-inset: 0px;
 
   width: 104px;
-  height: 64px;
+  height: 52px;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -1360,11 +1361,12 @@ code {
 
 .maps-7 .map-winner-badge > span {
   font-size: 13px;
+  margin-top: -10px;
 }
 
 .maps-7 .map-winner-logo {
   width: 82px;
-  height: 50px;
+  height: 42px;
 }
 
 .map-card::before {
