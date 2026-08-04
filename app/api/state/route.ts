@@ -2,6 +2,10 @@ export const dynamic = "force-dynamic";
 
 const KEY_PREFIX = "nobori:broadcast-state";
 
+function firstEnv(names: string[]) {
+  return names.map((name) => process.env[name]).find(Boolean);
+}
+
 function responseJson(body: unknown, init?: ResponseInit) {
   return Response.json(body, {
     ...init,
@@ -13,14 +17,21 @@ function responseJson(body: unknown, init?: ResponseInit) {
 }
 
 function getRedisConfig() {
-  const url =
-    process.env.KV_REST_API_URL ??
-    process.env.UPSTASH_REDIS_REST_URL ??
-    process.env.REDIS_REST_API_URL;
-  const token =
-    process.env.KV_REST_API_TOKEN ??
-    process.env.UPSTASH_REDIS_REST_TOKEN ??
-    process.env.REDIS_REST_API_TOKEN;
+  const url = firstEnv([
+    "KV_REST_API_URL",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_KV_REST_API_URL",
+    "UPSTASH_REDIS_REST_REDIS_URL",
+    "UPSTASH_REDIS_REST_KV_URL",
+    "REDIS_REST_API_URL",
+  ]);
+  const token = firstEnv([
+    "KV_REST_API_TOKEN",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "UPSTASH_REDIS_REST_KV_REST_API_TOKEN",
+    "UPSTASH_REDIS_REST_KV_REST_API_READ_ONLY_TOKEN",
+    "REDIS_REST_API_TOKEN",
+  ]);
 
   if (!url || !token) return null;
 
