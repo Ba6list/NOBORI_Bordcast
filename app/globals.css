@@ -1308,8 +1308,36 @@ code {
   z-index: 2;
 }
 
+.map-winner-logo {
+  --image-inset: 0px;
+
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  width: 92px;
+  height: 66px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0.68;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.82));
+}
+
+.map-winner-logo img {
+  width: 100%;
+  height: 100%;
+}
+
 .maps-7 .map-panel .map-card {
   grid-template-rows: 270px minmax(0, 1fr);
+}
+
+.maps-7 .map-winner-logo {
+  top: 14px;
+  left: 14px;
+  width: 74px;
+  height: 54px;
 }
 
 .map-card::before {

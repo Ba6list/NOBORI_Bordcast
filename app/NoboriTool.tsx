@@ -2250,6 +2250,8 @@ function MapPickScene({ state }: { state: NoboriState }) {
           {maps.map((map, index) => {
             const selected = isMapSelected(map);
             const mapImage = selected ? map.imageUrl.trim() : "";
+            const winnerTeam =
+              selected && map.winner !== "none" ? state.teams[map.winner] : null;
 
             return (
               <article
@@ -2277,6 +2279,14 @@ function MapPickScene({ state }: { state: NoboriState }) {
                 }
                 key={`${map.name || "unselected"}-${index}`}
               >
+                {winnerTeam ? (
+                  <IconImage
+                    src={winnerTeam.logoUrl}
+                    label={winnerTeam.name}
+                    className="map-winner-logo"
+                    logoAdjust={winnerTeam.logoAdjust}
+                  />
+                ) : null}
                 <MapVisual map={map} index={index} useParentImage />
                 <div className="map-card-body">
                   {selected ? (
