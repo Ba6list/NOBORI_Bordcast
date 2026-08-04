@@ -2286,7 +2286,6 @@ function MapPickScene({ state }: { state: NoboriState }) {
                       label={winnerTeam.name}
                       className="map-winner-logo"
                     />
-                    <span>WIN</span>
                   </div>
                 ) : null}
                 <MapVisual map={map} index={index} useParentImage />

@@ -1311,31 +1311,17 @@ code {
 .map-winner-badge {
   --winner-logo-width: 104px;
   --winner-logo-height: 104px;
-  --winner-label-gap: 10px;
 
   position: absolute;
-  top: 18px;
-  left: 18px;
+  top: 50%;
+  left: 50%;
   z-index: 3;
   width: var(--winner-logo-width);
-  height: calc(var(--winner-logo-height) + var(--winner-label-gap) + 16px);
+  height: var(--winner-logo-height);
   opacity: 0.72;
+  transform: translate(-50%, -50%);
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.82));
   pointer-events: none;
-}
-
-.map-winner-badge > span {
-  position: absolute;
-  top: calc(var(--winner-logo-height) + var(--winner-label-gap));
-  left: 0;
-  width: var(--winner-logo-width);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 950;
-  line-height: 1;
-  margin-top: 0;
-  text-align: center;
-  text-shadow: 0 0 10px rgba(23, 189, 193, 0.62);
 }
 
 .map-winner-logo {
@@ -1363,14 +1349,6 @@ code {
 .maps-7 .map-winner-badge {
   --winner-logo-width: 82px;
   --winner-logo-height: 82px;
-
-  top: 14px;
-  left: 14px;
-}
-
-.maps-7 .map-winner-badge > span {
-  font-size: 13px;
-  margin-top: 0;
 }
 
 .maps-7 .map-winner-logo {
