@@ -2280,12 +2280,14 @@ function MapPickScene({ state }: { state: NoboriState }) {
                 key={`${map.name || "unselected"}-${index}`}
               >
                 {winnerTeam ? (
-                  <IconImage
-                    src={winnerTeam.logoUrl}
-                    label={winnerTeam.name}
-                    className="map-winner-logo"
-                    logoAdjust={winnerTeam.logoAdjust}
-                  />
+                  <div className="map-winner-badge">
+                    <IconImage
+                      src={winnerTeam.logoUrl}
+                      label={winnerTeam.name}
+                      className="map-winner-logo"
+                    />
+                    <span>WIN</span>
+                  </div>
                 ) : null}
                 <MapVisual map={map} index={index} useParentImage />
                 <div className="map-card-body">
