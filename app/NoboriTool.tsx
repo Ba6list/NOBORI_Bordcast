@@ -112,10 +112,16 @@ type StateBundle = {
   setState: (next: SetStateAction<NoboriState>) => void;
   resetState: () => void;
   ready: boolean;
+  sharedSync: SharedSyncStatus;
 };
+
+type SyncRole = "control" | "overlay";
+type SharedSyncStatus = "checking" | "connected" | "local";
 
 const STORAGE_KEY = "nobori-broadcast-control-v1";
 const CHANNEL_NAME = "nobori-broadcast-control";
+const STATE_API_PATH = "/api/state";
+const OVERLAY_POLL_INTERVAL_MS = 1000;
 const LEGACY_BACKGROUND = "/assets/nobori-kv-placeholder.png";
 const PLACEHOLDER_BACKGROUND = "/assets/nobori-stream-background.png";
 const NOBORI_MARK = "/assets/nobori-symbol.png";
@@ -872,14 +878,60 @@ function serializeState(state: NoboriState) {
   return JSON.stringify(normalizeState(state));
 }
 
-function useNoboriState(): StateBundle {
+function currentRoom() {
+  try {
+    return new URLSearchParams(window.location.search).get("room") || "main";
+  } catch {
+    return "main";
+  }
+}
+
+function stateApiUrl(room: string) {
+  const params = new URLSearchParams({ room });
+  return `${STATE_API_PATH}?${params.toString()}`;
+}
+
+async function fetchSharedState(room: string, signal?: AbortSignal) {
+  const response = await fetch(stateApiUrl(room), {
+    cache: "no-store",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`State sync failed: ${response.status}`);
+  }
+
+  return (await response.json()) as {
+    configured: boolean;
+    state: unknown | null;
+  };
+}
+
+async function publishSharedState(room: string, state: NoboriState) {
+  const response = await fetch(stateApiUrl(room), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ state: normalizeState(state) }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`State publish failed: ${response.status}`);
+  }
+
+  return (await response.json()) as { configured: boolean; ok?: boolean };
+}
+
+function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBundle {
   const [state, setInternalState] = useState<NoboriState>(() =>
     cloneDefaultState(),
   );
   const [ready, setReady] = useState(false);
+  const [sharedSync, setSharedSync] = useState<SharedSyncStatus>("checking");
   const channelRef = useRef<BroadcastChannel | null>(null);
   const lastSerializedRef = useRef("");
   const sourceId = useId();
+  const roomRef = useRef("main");
 
   const applyIncomingState = useCallback((incoming: unknown) => {
     const normalized = normalizeState(incoming as Partial<NoboriState>);
@@ -892,20 +944,41 @@ function useNoboriState(): StateBundle {
   }, []);
 
   useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      try {
-        const stored = window.localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          applyIncomingState(JSON.parse(stored));
-        }
-      } catch {
-        const reset = cloneDefaultState();
-        lastSerializedRef.current = serializeState(reset);
-        setInternalState(reset);
-      } finally {
-        setReady(true);
+    const abortController = new AbortController();
+    let hydratedState = cloneDefaultState();
+
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        hydratedState = normalizeState(JSON.parse(stored));
+        applyIncomingState(hydratedState);
       }
-    });
+    } catch {
+      const reset = cloneDefaultState();
+      hydratedState = reset;
+      lastSerializedRef.current = serializeState(reset);
+      setInternalState(reset);
+    } finally {
+      setReady(true);
+    }
+
+    roomRef.current = currentRoom();
+
+    if (role === "control") {
+      fetchSharedState(roomRef.current, abortController.signal)
+        .then((payload) => {
+          setSharedSync(payload.configured ? "connected" : "local");
+          if (payload.state) {
+            applyIncomingState(payload.state);
+            return;
+          }
+
+          if (payload.configured) {
+            void publishSharedState(roomRef.current, hydratedState);
+          }
+        })
+        .catch(() => setSharedSync("local"));
+    }
 
     const nextChannel =
       "BroadcastChannel" in window
@@ -941,15 +1014,52 @@ function useNoboriState(): StateBundle {
     window.addEventListener("storage", onStorage);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      abortController.abort();
       nextChannel?.close();
       channelRef.current = null;
       window.removeEventListener("storage", onStorage);
     };
-  }, [applyIncomingState, sourceId]);
+  }, [applyIncomingState, role, sourceId]);
+
+  useEffect(() => {
+    if (role !== "overlay") return;
+
+    const abortController = new AbortController();
+    let active = true;
+
+    const pollSharedState = async () => {
+      try {
+        const payload = await fetchSharedState(
+          roomRef.current,
+          abortController.signal,
+        );
+        if (!active) return;
+        setSharedSync(payload.configured ? "connected" : "local");
+        if (payload.state) {
+          applyIncomingState(payload.state);
+        }
+      } catch {
+        if (active) setSharedSync("local");
+      }
+    };
+
+    void pollSharedState();
+    const timer = window.setInterval(
+      pollSharedState,
+      OVERLAY_POLL_INTERVAL_MS,
+    );
+
+    return () => {
+      active = false;
+      abortController.abort();
+      window.clearInterval(timer);
+    };
+  }, [applyIncomingState, role]);
 
   useEffect(() => {
     if (!ready) return;
+    if (role === "control" && sharedSync === "checking") return;
+
     const normalized = normalizeState(state);
     const serialized = serializeState(normalized);
 
@@ -968,7 +1078,19 @@ function useNoboriState(): StateBundle {
       source: sourceId,
       state: normalized,
     });
-  }, [ready, sourceId, state]);
+
+    if (role === "control") {
+      const publishTimer = window.setTimeout(() => {
+        publishSharedState(roomRef.current, normalized)
+          .then((payload) => {
+            setSharedSync(payload.configured ? "connected" : "local");
+          })
+          .catch(() => setSharedSync("local"));
+      }, 250);
+
+      return () => window.clearTimeout(publishTimer);
+    }
+  }, [ready, role, sharedSync, sourceId, state]);
 
   const setState = useCallback((next: SetStateAction<NoboriState>) => {
     setInternalState((previous) =>
@@ -997,9 +1119,16 @@ function useNoboriState(): StateBundle {
       type: "reset",
       source: sourceId,
     });
-  }, [sourceId]);
+    if (role === "control") {
+      publishSharedState(roomRef.current, reset)
+        .then((payload) => {
+          setSharedSync(payload.configured ? "connected" : "local");
+        })
+        .catch(() => setSharedSync("local"));
+    }
+  }, [role, sourceId]);
 
-  return { state, setState, resetState, ready };
+  return { state, setState, resetState, ready, sharedSync };
 }
 
 function getMaxMaps(format: Format) {
@@ -1160,7 +1289,9 @@ function HeroSelect({
 }
 
 function AdminPage() {
-  const { state, setState, resetState, ready } = useNoboriState();
+  const { state, setState, resetState, ready, sharedSync } = useNoboriState({
+    role: "control",
+  });
   const [adminTab, setAdminTab] = useState<"match" | "maps" | "roster" | "ban">(
     "match",
   );
@@ -1305,9 +1436,13 @@ function AdminPage() {
           <p className="kicker">NOBORI BROADCAST CONTROL</p>
           <h1>NOBORI配信オーバーレイ</h1>
         </div>
-        <div className="sync-status" data-ready={ready}>
+        <div className="sync-status" data-ready={ready && sharedSync !== "local"}>
           <span />
-          {ready ? "OBSへ即時同期中" : "同期準備中"}
+          {ready
+            ? sharedSync === "connected"
+              ? "OBS共有同期中"
+              : "このブラウザ内のみ"
+            : "同期準備中"}
         </div>
       </header>
 
@@ -2385,7 +2520,7 @@ function BanScene({ state }: { state: NoboriState }) {
 }
 
 function ObsScene({ view }: { view: SceneView }) {
-  const { state } = useNoboriState();
+  const { state } = useNoboriState({ role: "overlay" });
   const [transparentOverride, setTransparentOverride] = useState(false);
   const [viewport, setViewport] = useState({ width: 1920, height: 1080 });
   const transparent =
