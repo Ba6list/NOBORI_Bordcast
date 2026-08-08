@@ -2250,7 +2250,9 @@ function MapPickScene({ state }: { state: NoboriState }) {
         <div className="map-grid">
           {maps.map((map, index) => {
             const selected = isMapSelected(map);
-            const mapImage = selected ? map.imageUrl.trim() : "";
+            const mapImage = selected
+              ? map.imageUrl.trim() || mapImageForName(map.name)
+              : "";
             const winnerTeam =
               selected && map.winner !== "none" ? state.teams[map.winner] : null;
 
