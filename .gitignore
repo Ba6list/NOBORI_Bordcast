@@ -59,6 +59,7 @@ next-env.d.ts
 !/public/assets/maps/kings-row.png
 !/public/assets/maps/lijiang-tower.png
 !/public/assets/maps/midtown.png
+!/public/assets/maps/neon-junction.png
 !/public/assets/maps/nepal.png
 !/public/assets/maps/new-junk-city.png
 !/public/assets/maps/new-queen-street.png

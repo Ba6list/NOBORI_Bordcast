@@ -393,6 +393,7 @@ const mapPool: { mode: string; maps: MapPoolEntry[] }[] = [
       { name: "Hollywood", fileName: "hollywood.png" },
       { name: "King's Row", fileName: "kings-row.png" },
       { name: "Midtown", fileName: "midtown.png" },
+      { name: "Neon Junction", fileName: "neon-junction.png" },
       { name: "Numbani", fileName: "numbani.png" },
       { name: "Paraíso", fileName: "paraiso.png" },
     ],
