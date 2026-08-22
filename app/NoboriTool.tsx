@@ -235,6 +235,7 @@ const heroRoleGroups: { role: HeroRole; heroes: Omit<HeroPreset, "imageUrl">[] }
     role: "Tank",
     heroes: [
       { name: "D.Va", fileName: "dva_png.png" },
+      { name: "D.Mon", fileName: "dmon_png.png" },
       { name: "Domina", fileName: "domina_png.png" },
       { name: "Doomfist", fileName: "doomfist_png.png" },
       { name: "Hazard", fileName: "hazard_png.png" },
