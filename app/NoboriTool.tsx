@@ -21,6 +21,7 @@ type HeroRole = "Tank" | "Damage" | "Support";
 type Winner = Side | "none";
 type Picker = Side | "none";
 type BackgroundMode = "background" | "transparent";
+type LineColorMode = "nobori" | "others";
 type MapStatus = "upcoming" | "picked" | "played" | "decider" | "banned";
 const playerRoles = ["Tank", "DPS", "Support"] as const;
 type PlayerRole = (typeof playerRoles)[number];
@@ -102,6 +103,9 @@ type NoboriState = {
   format: Format;
   backgroundMode: BackgroundMode;
   backgroundUrl: string;
+  noboriLogoEnabled: boolean;
+  lineColorMode: LineColorMode;
+  otherLineColor: string;
   teams: Record<Side, Team>;
   maps: MapPick[];
   bans: BanState;
@@ -125,6 +129,8 @@ const OVERLAY_POLL_INTERVAL_MS = 1000;
 const LEGACY_BACKGROUND = "/assets/nobori-kv-placeholder.png";
 const PLACEHOLDER_BACKGROUND = "/assets/nobori-stream-background.png";
 const NOBORI_MARK = "/assets/nobori-symbol.png";
+const NOBORI_COLOR = "#17bdc1";
+const DEFAULT_OTHER_LINE_COLOR = "#ffffff";
 const MAX_MAPS = 7;
 const PLAYERS_PER_TEAM = 5;
 const BANS_PER_MAP = MAX_MAPS;
@@ -589,6 +595,9 @@ const defaultState: NoboriState = {
   format: "FT3",
   backgroundMode: "background",
   backgroundUrl: PLACEHOLDER_BACKGROUND,
+  noboriLogoEnabled: true,
+  lineColorMode: "nobori",
+  otherLineColor: DEFAULT_OTHER_LINE_COLOR,
   teams: {
     left: {
       name: "TEAM ASCEND",
@@ -596,7 +605,7 @@ const defaultState: NoboriState = {
       score: 1,
       logoUrl: "",
       logoAdjust: DEFAULT_LOGO_ADJUST,
-      color: "#17bdc1",
+      color: NOBORI_COLOR,
       roster: defaultRosterLeft,
     },
     right: {
@@ -848,6 +857,13 @@ function normalizeState(input?: Partial<NoboriState>): NoboriState {
   if (!next.backgroundUrl || next.backgroundUrl === LEGACY_BACKGROUND) {
     next.backgroundUrl = PLACEHOLDER_BACKGROUND;
   }
+
+  next.noboriLogoEnabled = input?.noboriLogoEnabled !== false;
+  next.lineColorMode = input?.lineColorMode === "others" ? "others" : "nobori";
+  next.otherLineColor =
+    typeof input?.otherLineColor === "string"
+      ? input.otherLineColor
+      : DEFAULT_OTHER_LINE_COLOR;
 
   next.teams = {
     left: {
@@ -1538,6 +1554,80 @@ function AdminPage() {
                     placeholder="/assets/nobori-stream-background.png"
                   />
                 </Field>
+              </Section>
+
+              <Section title="ブランド設定" eyebrow="BRAND">
+                <div className="form-grid two">
+                  <Field label="NOBORIロゴ">
+                    <select
+                      value={state.noboriLogoEnabled ? "show" : "hide"}
+                      onChange={(event) =>
+                        setState((previous) => ({
+                          ...previous,
+                          noboriLogoEnabled: event.target.value === "show",
+                        }))
+                      }
+                    >
+                      <option value="show">表示</option>
+                      <option value="hide">非表示</option>
+                    </select>
+                  </Field>
+                  <Field label="線色">
+                    <select
+                      value={state.lineColorMode}
+                      onChange={(event) =>
+                        setState((previous) => ({
+                          ...previous,
+                          lineColorMode: event.target.value as LineColorMode,
+                        }))
+                      }
+                    >
+                      <option value="nobori">NOBORI</option>
+                      <option value="others">Others</option>
+                    </select>
+                  </Field>
+                  <Field label="Othersカラー">
+                    <input
+                      type="color"
+                      value={
+                        /^#[0-9a-f]{6}$/i.test(state.otherLineColor)
+                          ? state.otherLineColor
+                          : DEFAULT_OTHER_LINE_COLOR
+                      }
+                      disabled={state.lineColorMode !== "others"}
+                      onChange={(event) =>
+                        setState((previous) => ({
+                          ...previous,
+                          otherLineColor: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="カラーコード" hint="例: #ffffff">
+                    <input
+                      value={state.otherLineColor}
+                      disabled={state.lineColorMode !== "others"}
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      maxLength={7}
+                      onChange={(event) =>
+                        setState((previous) => ({
+                          ...previous,
+                          otherLineColor: event.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        setState((previous) => ({
+                          ...previous,
+                          otherLineColor: /^#[0-9a-f]{6}$/i.test(
+                            previous.otherLineColor,
+                          )
+                            ? previous.otherLineColor.toLowerCase()
+                            : DEFAULT_OTHER_LINE_COLOR,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
               </Section>
 
               <Section title="チーム情報" eyebrow="TEAMS">
