@@ -1178,6 +1178,17 @@ function teamColor(state: NoboriState, side: Side) {
   return state.teams[side].color;
 }
 
+function lineColor(state: NoboriState) {
+  if (
+    state.lineColorMode === "others" &&
+    /^#[0-9a-f]{6}$/i.test(state.otherLineColor)
+  ) {
+    return state.otherLineColor;
+  }
+
+  return NOBORI_COLOR;
+}
+
 function Field({
   label,
   children,
@@ -2275,7 +2286,9 @@ function SceneHeader({
           {state.matchTitle} / {state.roundName}
         </span>
       </div>
-      <img className="scene-mark" src={NOBORI_MARK} alt="" />
+      {state.noboriLogoEnabled ? (
+        <img className="scene-mark" src={NOBORI_MARK} alt="" />
+      ) : null}
     </header>
   );
 }
@@ -2631,6 +2644,7 @@ function ObsScene({ view }: { view: SceneView }) {
   const transparent =
     transparentOverride || state.backgroundMode === "transparent";
   const scale = Math.min(viewport.width / 1920, viewport.height / 1080);
+  const selectedLineColor = lineColor(state);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -2664,7 +2678,10 @@ function ObsScene({ view }: { view: SceneView }) {
         className="scene-canvas"
         style={{
           transform: `translate(-50%, -50%) scale(${scale})`,
-        }}
+          "--cyan": selectedLineColor,
+          "--nobori-cyan": selectedLineColor,
+          "--nobori-line-soft": selectedLineColor,
+        } as CSSProperties}
       >
         <SceneBackground state={state} transparent={transparent} />
         <div className="scene-frame">
