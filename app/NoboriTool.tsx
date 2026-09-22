@@ -139,6 +139,9 @@ const UNSELECTED_MAP_LABEL = "未選択";
 const TEAM_LOGO_DIR = "/assets/team-logos";
 const HERO_IMAGE_DIR = "/assets/heroes";
 const MAP_IMAGE_DIR = "/assets/maps";
+const LOCAL_LOGO_MAX_FILE_SIZE = 5 * 1024 * 1024;
+const LOCAL_LOGO_MAX_DIMENSION = 512;
+const LOCAL_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const DEFAULT_LOGO_ADJUST: LogoAdjust = {
   scale: 1,
   offsetX: 0,
@@ -204,6 +207,30 @@ const teamLogoGroups = [
 ];
 
 const teamLogoPresets = teamLogoGroups.flatMap((group) => group.presets);
+
+async function localLogoDataUrl(file: File) {
+  const bitmap = await createImageBitmap(file);
+
+  try {
+    const scale = Math.min(
+      1,
+      LOCAL_LOGO_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas is unavailable");
+    }
+
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/webp", 0.9);
+  } finally {
+    bitmap.close();
+  }
+}
 
 const statusLabels: Record<MapStatus, string> = {
   upcoming: "待機",
@@ -1326,6 +1353,10 @@ function AdminPage() {
   );
   const [preview, setPreview] = useState<SceneView>("map");
   const [origin, setOrigin] = useState("http://localhost:3000");
+  const [logoUploadErrors, setLogoUploadErrors] = useState<Record<Side, string>>({
+    left: "",
+    right: "",
+  });
   const visibleMapCount = getMaxMaps(state.format);
   const visibleMaps = state.maps.slice(0, visibleMapCount);
 
@@ -1345,6 +1376,35 @@ function AdminPage() {
         [side]: { ...previous.teams[side], ...patch },
       },
     }));
+  };
+
+  const updateTeamLogoFromFile = async (side: Side, file: File) => {
+    if (!LOCAL_LOGO_TYPES.has(file.type)) {
+      setLogoUploadErrors((previous) => ({
+        ...previous,
+        [side]: "PNG、JPEG、WebP画像を選択してください。",
+      }));
+      return;
+    }
+
+    if (file.size > LOCAL_LOGO_MAX_FILE_SIZE) {
+      setLogoUploadErrors((previous) => ({
+        ...previous,
+        [side]: "画像サイズは5MB以下にしてください。",
+      }));
+      return;
+    }
+
+    try {
+      const logoUrl = await localLogoDataUrl(file);
+      updateTeam(side, { logoUrl, logoAdjust: DEFAULT_LOGO_ADJUST });
+      setLogoUploadErrors((previous) => ({ ...previous, [side]: "" }));
+    } catch {
+      setLogoUploadErrors((previous) => ({
+        ...previous,
+        [side]: "画像を読み込めませんでした。別の画像をお試しください。",
+      }));
+    }
   };
 
   const updateTeamLogoAdjust = (side: Side, patch: Partial<LogoAdjust>) => {
@@ -1649,6 +1709,9 @@ function AdminPage() {
                         (preset) =>
                           preset.logoUrl === state.teams[side].logoUrl,
                       )?.logoUrl ?? "";
+                    const usesLocalLogo = state.teams[side].logoUrl.startsWith(
+                      "data:image/",
+                    );
 
                     return (
                       <div className="team-editor" key={side}>
@@ -1664,6 +1727,18 @@ function AdminPage() {
                           <select
                             value={selectedTeamPreset}
                             onChange={(event) => {
+                              if (!event.target.value) {
+                                updateTeam(side, {
+                                  logoUrl: "",
+                                  logoAdjust: DEFAULT_LOGO_ADJUST,
+                                });
+                                setLogoUploadErrors((previous) => ({
+                                  ...previous,
+                                  [side]: "",
+                                }));
+                                return;
+                              }
+
                               const preset = teamLogoPresets.find(
                                 (teamPreset) =>
                                   teamPreset.logoUrl === event.target.value,
@@ -1724,13 +1799,43 @@ function AdminPage() {
                         </div>
                         <Field label="ロゴURL">
                           <input
-                            value={state.teams[side].logoUrl}
+                            value={usesLocalLogo ? "" : state.teams[side].logoUrl}
                             onChange={(event) =>
                               updateTeam(side, { logoUrl: event.target.value })
                             }
-                            placeholder="/assets/team-logo.png"
+                            placeholder={
+                              usesLocalLogo
+                                ? "ローカル画像を使用中"
+                                : "/assets/team-logo.png"
+                            }
                           />
                         </Field>
+                        {selectedTeamPreset === "" ? (
+                          <Field
+                            label="PCからロゴを選択"
+                            hint={
+                              logoUploadErrors[side] ||
+                              "PNG・JPEG・WebP、5MB以下"
+                            }
+                          >
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={(event) => {
+                                const input = event.currentTarget;
+                                const file = input.files?.[0];
+
+                                if (file) {
+                                  void updateTeamLogoFromFile(side, file).finally(
+                                    () => {
+                                      input.value = "";
+                                    },
+                                  );
+                                }
+                              }}
+                            />
+                          </Field>
+                        ) : null}
                         <div className="logo-adjust-panel">
                           <div className="logo-adjust-head">
                             <span>ロゴ調整</span>
