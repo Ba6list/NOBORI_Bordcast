@@ -141,6 +141,9 @@ const HERO_IMAGE_DIR = "/assets/heroes";
 const MAP_IMAGE_DIR = "/assets/maps";
 const LOCAL_LOGO_MAX_FILE_SIZE = 5 * 1024 * 1024;
 const LOCAL_LOGO_MAX_DIMENSION = 512;
+const LOCAL_BACKGROUND_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const LOCAL_BACKGROUND_MAX_WIDTH = 1920;
+const LOCAL_BACKGROUND_MAX_HEIGHT = 1080;
 const LOCAL_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const DEFAULT_LOGO_ADJUST: LogoAdjust = {
   scale: 1,
@@ -208,14 +211,15 @@ const teamLogoGroups = [
 
 const teamLogoPresets = teamLogoGroups.flatMap((group) => group.presets);
 
-async function localLogoDataUrl(file: File) {
+async function localImageDataUrl(
+  file: File,
+  maxWidth: number,
+  maxHeight: number,
+) {
   const bitmap = await createImageBitmap(file);
 
   try {
-    const scale = Math.min(
-      1,
-      LOCAL_LOGO_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height),
-    );
+    const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -230,6 +234,22 @@ async function localLogoDataUrl(file: File) {
   } finally {
     bitmap.close();
   }
+}
+
+function localLogoDataUrl(file: File) {
+  return localImageDataUrl(
+    file,
+    LOCAL_LOGO_MAX_DIMENSION,
+    LOCAL_LOGO_MAX_DIMENSION,
+  );
+}
+
+function localBackgroundDataUrl(file: File) {
+  return localImageDataUrl(
+    file,
+    LOCAL_BACKGROUND_MAX_WIDTH,
+    LOCAL_BACKGROUND_MAX_HEIGHT,
+  );
 }
 
 const statusLabels: Record<MapStatus, string> = {
@@ -1357,8 +1377,10 @@ function AdminPage() {
     left: "",
     right: "",
   });
+  const [backgroundUploadError, setBackgroundUploadError] = useState("");
   const visibleMapCount = getMaxMaps(state.format);
   const visibleMaps = state.maps.slice(0, visibleMapCount);
+  const usesLocalBackground = state.backgroundUrl.startsWith("data:image/");
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -1376,6 +1398,32 @@ function AdminPage() {
         [side]: { ...previous.teams[side], ...patch },
       },
     }));
+  };
+
+  const updateBackgroundFromFile = async (file: File) => {
+    if (!LOCAL_LOGO_TYPES.has(file.type)) {
+      setBackgroundUploadError("PNG、JPEG、WebP画像を選択してください。");
+      return;
+    }
+
+    if (file.size > LOCAL_BACKGROUND_MAX_FILE_SIZE) {
+      setBackgroundUploadError("画像サイズは10MB以下にしてください。");
+      return;
+    }
+
+    try {
+      const backgroundUrl = await localBackgroundDataUrl(file);
+      setState((previous) => ({
+        ...previous,
+        backgroundMode: "background",
+        backgroundUrl,
+      }));
+      setBackgroundUploadError("");
+    } catch {
+      setBackgroundUploadError(
+        "画像を読み込めませんでした。別の画像をお試しください。",
+      );
+    }
   };
 
   const updateTeamLogoFromFile = async (side: Side, file: File) => {
@@ -1615,14 +1663,18 @@ function AdminPage() {
                   hint="添付KVを使う場合は public/assets に置いて /assets/ファイル名 を指定してください"
                 >
                   <input
-                    value={state.backgroundUrl}
+                    value={usesLocalBackground ? "" : state.backgroundUrl}
                     onChange={(event) =>
                       setState((previous) => ({
                         ...previous,
                         backgroundUrl: event.target.value,
                       }))
                     }
-                    placeholder="/assets/nobori-stream-background.png"
+                    placeholder={
+                      usesLocalBackground
+                        ? "ローカル画像を使用中"
+                        : "/assets/nobori-stream-background.png"
+                    }
                   />
                 </Field>
               </Section>
@@ -1699,6 +1751,30 @@ function AdminPage() {
                     />
                   </Field>
                 </div>
+                {state.lineColorMode === "others" ? (
+                  <Field
+                    label="PCから背景画像を選択"
+                    hint={
+                      backgroundUploadError ||
+                      "PNG・JPEG・WebP、10MB以下（最大1920×1080に軽量化）"
+                    }
+                  >
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => {
+                        const input = event.currentTarget;
+                        const file = input.files?.[0];
+
+                        if (file) {
+                          void updateBackgroundFromFile(file).finally(() => {
+                            input.value = "";
+                          });
+                        }
+                      }}
+                    />
+                  </Field>
+                ) : null}
               </Section>
 
               <Section title="チーム情報" eyebrow="TEAMS">
@@ -2773,8 +2849,12 @@ function ObsScene({ view }: { view: SceneView }) {
   }, []);
 
   useEffect(() => {
+    document.documentElement.classList.toggle("obs-transparent", transparent);
     document.body.classList.toggle("obs-transparent", transparent);
-    return () => document.body.classList.remove("obs-transparent");
+    return () => {
+      document.documentElement.classList.remove("obs-transparent");
+      document.body.classList.remove("obs-transparent");
+    };
   }, [transparent]);
 
   return (

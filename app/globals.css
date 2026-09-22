@@ -34,6 +34,7 @@ body {
     sans-serif;
 }
 
+html.obs-transparent,
 body.obs-transparent {
   background: transparent;
 }
