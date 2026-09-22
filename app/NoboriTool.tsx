@@ -126,6 +126,7 @@ const STORAGE_KEY = "nobori-broadcast-control-v1";
 const CHANNEL_NAME = "nobori-broadcast-control";
 const STATE_API_PATH = "/api/state";
 const OVERLAY_POLL_INTERVAL_MS = 1000;
+const SHARED_SYNC_SETTLE_MS = 10000;
 const LEGACY_BACKGROUND = "/assets/nobori-kv-placeholder.png";
 const PLACEHOLDER_BACKGROUND = "/assets/nobori-stream-background.png";
 const NOBORI_MARK = "/assets/nobori-symbol.png";
@@ -995,6 +996,10 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   const [sharedSync, setSharedSync] = useState<SharedSyncStatus>("checking");
   const channelRef = useRef<BroadcastChannel | null>(null);
   const lastSerializedRef = useRef("");
+  const pendingBroadcastRef = useRef<{
+    serialized: string;
+    expiresAt: number;
+  } | null>(null);
   const sourceId = useId();
   const roomRef = useRef("main");
 
@@ -1055,7 +1060,16 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
       nextChannel.onmessage = (event: MessageEvent) => {
         if (event.data?.source === sourceId) return;
         if (event.data?.type === "state") {
-          applyIncomingState(event.data.state);
+          const incoming = normalizeState(event.data.state);
+
+          if (role === "overlay") {
+            pendingBroadcastRef.current = {
+              serialized: serializeState(incoming),
+              expiresAt: Date.now() + SHARED_SYNC_SETTLE_MS,
+            };
+          }
+
+          applyIncomingState(incoming);
         }
         if (event.data?.type === "reset") {
           const reset = cloneDefaultState();
@@ -1101,7 +1115,23 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
         if (!active) return;
         setSharedSync(payload.configured ? "connected" : "local");
         if (payload.state) {
-          applyIncomingState(payload.state);
+          const incoming = normalizeState(
+            payload.state as Partial<NoboriState>,
+          );
+          const incomingSerialized = serializeState(incoming);
+          const pendingBroadcast = pendingBroadcastRef.current;
+
+          if (pendingBroadcast) {
+            if (incomingSerialized === pendingBroadcast.serialized) {
+              pendingBroadcastRef.current = null;
+            } else if (Date.now() < pendingBroadcast.expiresAt) {
+              return;
+            } else {
+              pendingBroadcastRef.current = null;
+            }
+          }
+
+          applyIncomingState(incoming);
         }
       } catch {
         if (active) setSharedSync("local");
