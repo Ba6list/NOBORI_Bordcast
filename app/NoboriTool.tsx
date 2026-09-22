@@ -1728,12 +1728,19 @@ function AdminPage() {
                   <Field label="線色">
                     <select
                       value={state.lineColorMode}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const lineColorMode = event.target.value as LineColorMode;
+
                         setState((previous) => ({
                           ...previous,
-                          lineColorMode: event.target.value as LineColorMode,
-                        }))
-                      }
+                          lineColorMode,
+                          backgroundUrl:
+                            lineColorMode === "nobori" &&
+                            previous.backgroundUrl.startsWith("data:image/")
+                              ? PLACEHOLDER_BACKGROUND
+                              : previous.backgroundUrl,
+                        }));
+                      }}
                     >
                       <option value="nobori">NOBORI</option>
                       <option value="others">Others</option>
