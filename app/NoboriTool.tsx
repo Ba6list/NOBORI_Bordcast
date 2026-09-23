@@ -403,7 +403,10 @@ function heroImageForName(heroName: string) {
 function heroCropClass(heroName: string, imageUrl = "") {
   const hero = findHeroPreset(heroName) ?? findHeroPresetByImageUrl(imageUrl);
 
-  return hero?.name === "Wrecking Ball" ? "hero-crop-full" : "hero-crop-upper";
+  if (hero?.name === "Wrecking Ball") return "hero-crop-full";
+  return hero?.name === "Mauga"
+    ? "hero-crop-upper hero-crop-mauga"
+    : "hero-crop-upper";
 }
 
 const mapPool: { mode: string; maps: MapPoolEntry[] }[] = [
