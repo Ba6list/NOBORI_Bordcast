@@ -90,11 +90,22 @@ export async function GET(request: Request) {
     }
 
     const stored = JSON.parse(result) as { state?: unknown; updatedAt?: string };
+    const requestedUpdatedAt = new URL(request.url).searchParams.get("since");
+
+    if (requestedUpdatedAt && requestedUpdatedAt === stored.updatedAt) {
+      return responseJson({
+        configured: true,
+        state: null,
+        updatedAt: stored.updatedAt,
+        unchanged: true,
+      });
+    }
 
     return responseJson({
       configured: true,
       state: stored.state ?? null,
       updatedAt: stored.updatedAt ?? null,
+      unchanged: false,
     });
   } catch (error) {
     return responseJson(

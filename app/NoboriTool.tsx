@@ -955,13 +955,18 @@ function currentRoom() {
   }
 }
 
-function stateApiUrl(room: string) {
+function stateApiUrl(room: string, since?: string) {
   const params = new URLSearchParams({ room });
+  if (since) params.set("since", since);
   return `${STATE_API_PATH}?${params.toString()}`;
 }
 
-async function fetchSharedState(room: string, signal?: AbortSignal) {
-  const response = await fetch(stateApiUrl(room), {
+async function fetchSharedState(
+  room: string,
+  signal?: AbortSignal,
+  since?: string,
+) {
+  const response = await fetch(stateApiUrl(room, since), {
     cache: "no-store",
     signal,
   });
@@ -973,6 +978,8 @@ async function fetchSharedState(room: string, signal?: AbortSignal) {
   return (await response.json()) as {
     configured: boolean;
     state: unknown | null;
+    updatedAt?: string | null;
+    unchanged?: boolean;
   };
 }
 
@@ -1005,6 +1012,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   } | null>(null);
   const sourceId = useId();
   const roomRef = useRef("main");
+  const sharedUpdatedAtRef = useRef("");
 
   const applyIncomingState = useCallback((incoming: unknown) => {
     const normalized = normalizeState(incoming as Partial<NoboriState>);
@@ -1041,6 +1049,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
       fetchSharedState(roomRef.current, abortController.signal)
         .then((payload) => {
           setSharedSync(payload.configured ? "connected" : "local");
+          sharedUpdatedAtRef.current = payload.updatedAt ?? "";
           if (payload.state) {
             applyIncomingState(payload.state);
             return;
@@ -1114,9 +1123,11 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
         const payload = await fetchSharedState(
           roomRef.current,
           abortController.signal,
+          sharedUpdatedAtRef.current,
         );
         if (!active) return;
         setSharedSync(payload.configured ? "connected" : "local");
+        sharedUpdatedAtRef.current = payload.updatedAt ?? "";
         if (payload.state) {
           const incoming = normalizeState(
             payload.state as Partial<NoboriState>,
