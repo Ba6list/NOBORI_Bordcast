@@ -12,6 +12,11 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  applyStatePatch,
+  createStatePatch,
+  type StatePatchOperation,
+} from "./statePatch";
 
 type SceneView = "map" | "roster" | "ban";
 type Format = "FT3" | "FT4";
@@ -995,7 +1000,35 @@ async function publishSharedState(room: string, state: NoboriState) {
     throw new Error(`State publish failed: ${response.status}`);
   }
 
-  return (await response.json()) as { configured: boolean; ok?: boolean };
+  return (await response.json()) as {
+    configured: boolean;
+    ok?: boolean;
+    state?: unknown;
+    updatedAt?: string;
+  };
+}
+
+async function publishSharedPatch(
+  room: string,
+  patch: StatePatchOperation[],
+) {
+  const response = await fetch(stateApiUrl(room), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ patch }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`State patch failed: ${response.status}`);
+  }
+
+  return (await response.json()) as {
+    configured: boolean;
+    ok?: boolean;
+    state?: unknown;
+    updatedAt?: string;
+  };
 }
 
 function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBundle {
@@ -1013,6 +1046,9 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   const sourceId = useId();
   const roomRef = useRef("main");
   const sharedUpdatedAtRef = useRef("");
+  const sharedStateRef = useRef<NoboriState | null>(null);
+  const currentStateRef = useRef(state);
+  const publishQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const applyIncomingState = useCallback((incoming: unknown) => {
     const normalized = normalizeState(incoming as Partial<NoboriState>);
@@ -1021,6 +1057,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     if (serialized === lastSerializedRef.current) return;
 
     lastSerializedRef.current = serialized;
+    currentStateRef.current = normalized;
     setInternalState(normalized);
   }, []);
 
@@ -1038,6 +1075,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
       const reset = cloneDefaultState();
       hydratedState = reset;
       lastSerializedRef.current = serializeState(reset);
+      currentStateRef.current = reset;
       setInternalState(reset);
     } finally {
       setReady(true);
@@ -1051,12 +1089,22 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
           setSharedSync(payload.configured ? "connected" : "local");
           sharedUpdatedAtRef.current = payload.updatedAt ?? "";
           if (payload.state) {
-            applyIncomingState(payload.state);
+            const incoming = normalizeState(payload.state as Partial<NoboriState>);
+            sharedStateRef.current = incoming;
+            applyIncomingState(incoming);
             return;
           }
 
           if (payload.configured) {
-            void publishSharedState(roomRef.current, hydratedState);
+            void publishSharedState(roomRef.current, hydratedState).then(
+              (published) => {
+                if (!published.state) return;
+                sharedUpdatedAtRef.current = published.updatedAt ?? "";
+                sharedStateRef.current = normalizeState(
+                  published.state as Partial<NoboriState>,
+                );
+              },
+            );
           }
         })
         .catch(() => setSharedSync("local"));
@@ -1113,8 +1161,6 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   }, [applyIncomingState, role, sourceId]);
 
   useEffect(() => {
-    if (role !== "overlay") return;
-
     const abortController = new AbortController();
     let active = true;
 
@@ -1143,6 +1189,26 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
             } else {
               pendingBroadcastRef.current = null;
             }
+          }
+
+          if (role === "control" && sharedStateRef.current) {
+            const localPatch = createStatePatch(
+              sharedStateRef.current,
+              currentStateRef.current,
+            );
+            sharedStateRef.current = incoming;
+
+            if (localPatch.length > 0) {
+              const merged = normalizeState(
+                applyStatePatch(incoming, localPatch),
+              );
+              lastSerializedRef.current = serializeState(incoming);
+              currentStateRef.current = merged;
+              setInternalState(merged);
+              return;
+            }
+          } else if (role === "control") {
+            sharedStateRef.current = incoming;
           }
 
           applyIncomingState(incoming);
@@ -1190,25 +1256,58 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
 
     if (role === "control") {
       const publishTimer = window.setTimeout(() => {
-        publishSharedState(roomRef.current, normalized)
-          .then((payload) => {
+        publishQueueRef.current = publishQueueRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            const base = sharedStateRef.current;
+            if (!base) return;
+
+            const localState = currentStateRef.current;
+            const patch = createStatePatch(base, localState);
+            if (patch.length === 0) return;
+
+            const payload = await publishSharedPatch(roomRef.current, patch);
             setSharedSync(payload.configured ? "connected" : "local");
+            if (!payload.state) return;
+
+            const publishedState = normalizeState(
+              payload.state as Partial<NoboriState>,
+            );
+            const pendingPatch = createStatePatch(
+              localState,
+              currentStateRef.current,
+            );
+            sharedUpdatedAtRef.current = payload.updatedAt ?? "";
+            sharedStateRef.current = publishedState;
+
+            if (pendingPatch.length > 0) {
+              const merged = normalizeState(
+                applyStatePatch(publishedState, pendingPatch),
+              );
+              lastSerializedRef.current = serializeState(publishedState);
+              currentStateRef.current = merged;
+              setInternalState(merged);
+            } else {
+              applyIncomingState(publishedState);
+            }
           })
           .catch(() => setSharedSync("local"));
       }, 250);
 
       return () => window.clearTimeout(publishTimer);
     }
-  }, [ready, role, sharedSync, sourceId, state]);
+  }, [applyIncomingState, ready, role, sharedSync, sourceId, state]);
 
   const setState = useCallback((next: SetStateAction<NoboriState>) => {
-    setInternalState((previous) =>
-      normalizeState(
+    setInternalState((previous) => {
+      const normalized = normalizeState(
         typeof next === "function"
           ? (next as (value: NoboriState) => NoboriState)(previous)
           : next,
-      ),
-    );
+      );
+      currentStateRef.current = normalized;
+      return normalized;
+    });
   }, []);
 
   const resetState = useCallback(() => {
@@ -1216,6 +1315,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     const serialized = serializeState(reset);
 
     lastSerializedRef.current = serialized;
+    currentStateRef.current = reset;
     setInternalState(reset);
 
     try {
