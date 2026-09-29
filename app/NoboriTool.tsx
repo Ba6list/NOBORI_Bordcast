@@ -1508,6 +1508,50 @@ function HeroSelect({
   );
 }
 
+function ScoreStepper({
+  side,
+  team,
+  onChange,
+}: {
+  side: Side;
+  team: Team;
+  onChange: (score: number) => void;
+}) {
+  const teamLabel = team.name.trim() || (side === "left" ? "LEFT TEAM" : "RIGHT TEAM");
+
+  return (
+    <div className={`global-score-team ${side}`}>
+      <span className="global-score-name" title={teamLabel}>
+        {teamLabel}
+      </span>
+      <div className="score-stepper">
+        <button
+          type="button"
+          aria-label={`${teamLabel}のスコアを1減らす`}
+          disabled={team.score <= 0}
+          onClick={() => onChange(Math.max(0, team.score - 1))}
+        >
+          −
+        </button>
+        <input
+          type="number"
+          min="0"
+          aria-label={`${teamLabel}のスコア`}
+          value={team.score}
+          onChange={(event) => onChange(safeNumber(event.target.value))}
+        />
+        <button
+          type="button"
+          aria-label={`${teamLabel}のスコアを1増やす`}
+          onClick={() => onChange(team.score + 1)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AdminPage() {
   const { state, setState, resetState, ready, sharedSync } = useNoboriState({
     role: "control",
@@ -1746,6 +1790,21 @@ function AdminPage() {
               </button>
             ))}
           </nav>
+
+          <div className="global-score-control" aria-label="スコア操作">
+            <span className="global-score-label">SCORE</span>
+            <ScoreStepper
+              side="left"
+              team={state.teams.left}
+              onChange={(score) => updateTeam("left", { score })}
+            />
+            <span className="global-score-divider">−</span>
+            <ScoreStepper
+              side="right"
+              team={state.teams.right}
+              onChange={(score) => updateTeam("right", { score })}
+            />
+          </div>
 
           {adminTab === "match" ? (
             <div className="control-stack">
