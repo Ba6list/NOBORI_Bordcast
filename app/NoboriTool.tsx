@@ -952,9 +952,19 @@ function serializeState(state: NoboriState) {
   return JSON.stringify(normalizeState(state));
 }
 
+function normalizeRoomName(value: string) {
+  return value.toLowerCase() === "others" ? "others" : "main";
+}
+
+function roomStorageKey(room: string) {
+  return `${STORAGE_KEY}:${normalizeRoomName(room)}`;
+}
+
 function currentRoom() {
   try {
-    return new URLSearchParams(window.location.search).get("room") || "main";
+    return normalizeRoomName(
+      new URLSearchParams(window.location.search).get("room") || "main",
+    );
   } catch {
     return "main";
   }
@@ -1064,9 +1074,14 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   useEffect(() => {
     const abortController = new AbortController();
     let hydratedState = cloneDefaultState();
+    const room = currentRoom();
+    const storageKey = roomStorageKey(room);
+    roomRef.current = room;
 
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored =
+        window.localStorage.getItem(storageKey) ??
+        (room === "main" ? window.localStorage.getItem(STORAGE_KEY) : null);
       if (stored) {
         hydratedState = normalizeState(JSON.parse(stored));
         applyIncomingState(hydratedState);
@@ -1080,8 +1095,6 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     } finally {
       setReady(true);
     }
-
-    roomRef.current = currentRoom();
 
     if (role === "control") {
       fetchSharedState(roomRef.current, abortController.signal)
@@ -1099,10 +1112,24 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
             void publishSharedState(roomRef.current, hydratedState).then(
               (published) => {
                 if (!published.state) return;
-                sharedUpdatedAtRef.current = published.updatedAt ?? "";
-                sharedStateRef.current = normalizeState(
+                const publishedState = normalizeState(
                   published.state as Partial<NoboriState>,
                 );
+                const pendingPatch = createStatePatch(
+                  hydratedState,
+                  currentStateRef.current,
+                );
+                sharedUpdatedAtRef.current = published.updatedAt ?? "";
+                sharedStateRef.current = publishedState;
+
+                if (pendingPatch.length > 0) {
+                  const merged = normalizeState(
+                    applyStatePatch(publishedState, pendingPatch),
+                  );
+                  lastSerializedRef.current = serializeState(publishedState);
+                  currentStateRef.current = merged;
+                  setInternalState(merged);
+                }
               },
             );
           }
@@ -1112,7 +1139,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
 
     const nextChannel =
       "BroadcastChannel" in window
-        ? new BroadcastChannel(CHANNEL_NAME)
+        ? new BroadcastChannel(`${CHANNEL_NAME}:${room}`)
         : null;
     channelRef.current = nextChannel;
 
@@ -1134,18 +1161,20 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
         if (event.data?.type === "reset") {
           const reset = cloneDefaultState();
           lastSerializedRef.current = serializeState(reset);
+          currentStateRef.current = reset;
           setInternalState(reset);
         }
       };
     }
 
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      if (event.key !== storageKey || !event.newValue) return;
       try {
         applyIncomingState(JSON.parse(event.newValue));
       } catch {
         const reset = cloneDefaultState();
         lastSerializedRef.current = serializeState(reset);
+        currentStateRef.current = reset;
         setInternalState(reset);
       }
     };
@@ -1243,7 +1272,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     lastSerializedRef.current = serialized;
 
     try {
-      window.localStorage.setItem(STORAGE_KEY, serialized);
+      window.localStorage.setItem(roomStorageKey(roomRef.current), serialized);
     } catch {
       // OBSや一部ブラウザ環境で保存が拒否されても画面操作は止めない。
     }
@@ -1319,7 +1348,7 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     setInternalState(reset);
 
     try {
-      window.localStorage.setItem(STORAGE_KEY, serialized);
+      window.localStorage.setItem(roomStorageKey(roomRef.current), serialized);
     } catch {
       // 保存できない環境でもリセット表示自体は反映する。
     }
@@ -1332,6 +1361,11 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
       publishSharedState(roomRef.current, reset)
         .then((payload) => {
           setSharedSync(payload.configured ? "connected" : "local");
+          if (!payload.state) return;
+          sharedUpdatedAtRef.current = payload.updatedAt ?? "";
+          sharedStateRef.current = normalizeState(
+            payload.state as Partial<NoboriState>,
+          );
         })
         .catch(() => setSharedSync("local"));
     }
@@ -1561,6 +1595,7 @@ function AdminPage() {
   );
   const [preview, setPreview] = useState<SceneView>("map");
   const [origin, setOrigin] = useState("http://localhost:3000");
+  const [room, setRoom] = useState("main");
   const [logoUploadErrors, setLogoUploadErrors] = useState<Record<Side, string>>({
     left: "",
     right: "",
@@ -1573,10 +1608,42 @@ function AdminPage() {
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
       setOrigin(window.location.origin);
+      const activeRoom = currentRoom();
+      setRoom(activeRoom);
     });
 
     return () => window.cancelAnimationFrame(frameId);
   }, []);
+
+  const obsPath = (
+    view: SceneView,
+    options: { preview?: boolean; transparent?: boolean } = {},
+  ) => {
+    const params = new URLSearchParams({ room });
+    if (options.preview) params.set("preview", "1");
+    if (options.transparent) params.set("transparent", "1");
+    return `/obs/${view}?${params.toString()}`;
+  };
+
+  const switchRoom = (nextRoom: "main" | "others") => {
+    if (nextRoom === room) return;
+    const url = new URL(window.location.href);
+    url.search = new URLSearchParams({ room: nextRoom }).toString();
+    url.hash = "";
+    window.location.assign(url.toString());
+  };
+
+  const resetCurrentRoom = () => {
+    if (
+      !window.confirm(
+        `ルーム「${room === "others" ? "Others" : "NOBORI"}」の設定をすべて初期状態に戻します。よろしいですか？`,
+      )
+    ) {
+      return;
+    }
+
+    resetState();
+  };
 
   const updateTeam = (side: Side, patch: Partial<Team>) => {
     setState((previous) => ({
@@ -1773,6 +1840,35 @@ function AdminPage() {
 
       <div className="admin-grid">
         <div className="control-panel">
+          <div className="room-toolbar">
+            <div className="room-switcher">
+              <span>ROOM</span>
+              <div className="room-options" role="group" aria-label="ルーム選択">
+                <button
+                  className={room === "main" ? "active" : ""}
+                  type="button"
+                  onClick={() => switchRoom("main")}
+                >
+                  NOBORI
+                </button>
+                <button
+                  className={room === "others" ? "active" : ""}
+                  type="button"
+                  onClick={() => switchRoom("others")}
+                >
+                  Others
+                </button>
+              </div>
+            </div>
+            <button
+              className="danger-button room-reset-button"
+              type="button"
+              onClick={resetCurrentRoom}
+            >
+              すべて初期設定に戻す
+            </button>
+          </div>
+
           <nav className="tab-bar" aria-label="編集項目">
             {[
               ["match", "試合"],
@@ -2209,23 +2305,27 @@ function AdminPage() {
                   {(["map", "roster", "ban"] as SceneView[]).map((view) => (
                     <div className="url-row" key={view}>
                       <strong>{view.toUpperCase()}</strong>
-                      <input readOnly value={`${origin}/obs/${view}`} />
-                      <a href={`/obs/${view}`} target="_blank" rel="noreferrer">
+                      <input readOnly value={`${origin}${obsPath(view)}`} />
+                      <a href={obsPath(view)} target="_blank" rel="noreferrer">
                         開く
                       </a>
                     </div>
                   ))}
                   <div className="url-row">
                     <strong>透過URL</strong>
-                    <input readOnly value={`${origin}/obs/map?transparent=1`} />
-                    <a href="/obs/map?transparent=1" target="_blank" rel="noreferrer">
+                    <input
+                      readOnly
+                      value={`${origin}${obsPath("map", { transparent: true })}`}
+                    />
+                    <a
+                      href={obsPath("map", { transparent: true })}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       開く
                     </a>
                   </div>
                 </div>
-                <button className="danger-button" type="button" onClick={resetState}>
-                  初期状態に戻す
-                </button>
               </Section>
             </div>
           ) : null}
@@ -2631,7 +2731,10 @@ function AdminPage() {
             </div>
           </div>
           <div className="preview-frame">
-            <iframe src={`/obs/${preview}?preview=1`} title="OBS preview" />
+            <iframe
+              src={obsPath(preview, { preview: true })}
+              title="OBS preview"
+            />
           </div>
           <div className="preview-note">
             OBSは 1920 x 1080 のブラウザソース想定です。透過にしたい場合は各OBS URLに
