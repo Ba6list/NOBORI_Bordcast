@@ -432,6 +432,7 @@ const mapPool: { mode: string; maps: MapPoolEntry[] }[] = [
     maps: [
       { name: "Circuit Royal", fileName: "circuit-royal.png" },
       { name: "Dorado", fileName: "dorado.png" },
+      { name: "Grimsvötn", fileName: "grimsvotn.png" },
       { name: "Havana", fileName: "havana.png" },
       { name: "Junkertown", fileName: "junkertown.png" },
       { name: "Rialto", fileName: "rialto.png" },
