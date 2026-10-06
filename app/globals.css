@@ -1849,6 +1849,13 @@ code {
   max-width: none;
 }
 
+.roster-panel .player-card.hero-crop-doctrine .player-photo img {
+  width: 400%;
+  height: 400%;
+  max-width: none;
+  transform: translateY(2%);
+}
+
 .roster-panel .player-card.hero-crop-full .player-photo img {
   align-self: center;
   justify-self: center;
@@ -2038,6 +2045,15 @@ code {
 .ban-hero-fullbody.hero-crop-mauga {
   transform:
     translate(var(--hero-offset-x), calc(var(--hero-offset-y) + 10%))
+    scale(var(--hero-scale));
+}
+
+.ban-hero-fullbody.hero-crop-doctrine {
+  width: 300%;
+  height: 300%;
+  max-width: none;
+  transform:
+    translate(var(--hero-offset-x), var(--hero-offset-y))
     scale(var(--hero-scale));
 }
 

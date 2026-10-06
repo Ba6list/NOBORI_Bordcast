@@ -344,6 +344,7 @@ const heroRoleGroups: { role: HeroRole; heroes: Omit<HeroPreset, "imageUrl">[] }
       { name: "Ana", fileName: "ana_png.png" },
       { name: "Baptiste", fileName: "baptiste_png.png" },
       { name: "Brigitte", fileName: "brigitte_png.png" },
+      { name: "Doctrine", fileName: "doctrine_png.png" },
       { name: "Illari", fileName: "illari_png.png" },
       { name: "Jetpack Cat", fileName: "jetpack-cat_png.png" },
       { name: "Juno", fileName: "juno_png.png" },
@@ -409,6 +410,7 @@ function heroCropClass(heroName: string, imageUrl = "") {
   const hero = findHeroPreset(heroName) ?? findHeroPresetByImageUrl(imageUrl);
 
   if (hero?.name === "Wrecking Ball") return "hero-crop-full";
+  if (hero?.name === "Doctrine") return "hero-crop-upper hero-crop-doctrine";
   return hero?.name === "Mauga"
     ? "hero-crop-upper hero-crop-mauga"
     : "hero-crop-upper";
