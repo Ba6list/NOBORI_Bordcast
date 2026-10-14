@@ -28,8 +28,8 @@ test("server-renders the NOBORI control room", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>NOBORI Broadcast Control<\/title>/i);
-  assert.match(html, /NOBORI BROADCAST CONTROL/);
+  assert.match(html, /<title>NOBORI Board<\/title>/i);
+  assert.match(html, /NOBORI BOARD/);
   assert.match(html, /OBS/);
   assert.match(html, /\/obs\/map/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);

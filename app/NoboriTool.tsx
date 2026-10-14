@@ -1884,8 +1884,8 @@ function AdminPage() {
     <main className="admin-shell">
       <header className="admin-header">
         <div>
-          <p className="kicker">NOBORI BROADCAST CONTROL</p>
-          <h1>NOBORI配信オーバーレイ</h1>
+          <p className="kicker">NOBORI BOARD</p>
+          <h1>NOBORI Board</h1>
         </div>
         <div className="sync-status" data-ready={ready && sharedSync !== "local"}>
           <span />

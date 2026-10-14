@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NOBORI Broadcast Control",
+  title: "NOBORI Board",
   description: "OBS browser-source overlays for NOBORI Overwatch broadcasts.",
   icons: {
     icon: "/favicon.svg",

@@ -1,4 +1,4 @@
-# NOBORI Broadcast Control
+# NOBORI Board
 
 Overwatch大会「NOBORI」向けのOBSブラウザソース用Webツールです。
 
