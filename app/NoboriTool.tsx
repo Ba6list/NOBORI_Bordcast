@@ -122,12 +122,23 @@ type StateBundle = {
   resetState: () => void;
   ready: boolean;
   sharedSync: SharedSyncStatus;
+  actorName: string;
+  setActorName: (name: string) => void;
+  history: ChangeLogEntry[];
+};
+
+type ChangeLogEntry = {
+  id: string;
+  actor: string;
+  at: string;
+  action: "change" | "reset";
 };
 
 type SyncRole = "control" | "overlay";
 type SharedSyncStatus = "checking" | "connected" | "local";
 
 const STORAGE_KEY = "nobori-broadcast-control-v1";
+const ACTOR_STORAGE_KEY = "nobori-broadcast-operator";
 const CHANNEL_NAME = "nobori-broadcast-control";
 const STATE_API_PATH = "/api/state";
 const OVERLAY_POLL_INTERVAL_MS = 1000;
@@ -973,9 +984,10 @@ function currentRoom() {
   }
 }
 
-function stateApiUrl(room: string, since?: string) {
+function stateApiUrl(room: string, since?: string, history = false) {
   const params = new URLSearchParams({ room });
   if (since) params.set("since", since);
+  if (history) params.set("history", "1");
   return `${STATE_API_PATH}?${params.toString()}`;
 }
 
@@ -983,8 +995,9 @@ async function fetchSharedState(
   room: string,
   signal?: AbortSignal,
   since?: string,
+  history = false,
 ) {
-  const response = await fetch(stateApiUrl(room, since), {
+  const response = await fetch(stateApiUrl(room, since, history), {
     cache: "no-store",
     signal,
   });
@@ -998,14 +1011,20 @@ async function fetchSharedState(
     state: unknown | null;
     updatedAt?: string | null;
     unchanged?: boolean;
+    history?: ChangeLogEntry[];
   };
 }
 
-async function publishSharedState(room: string, state: NoboriState) {
-  const response = await fetch(stateApiUrl(room), {
+async function publishSharedState(
+  room: string,
+  state: NoboriState,
+  actor: string,
+  action: "initialize" | "reset",
+) {
+  const response = await fetch(stateApiUrl(room, undefined, true), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ state: normalizeState(state) }),
+    body: JSON.stringify({ state: normalizeState(state), actor, action }),
     cache: "no-store",
   });
 
@@ -1018,17 +1037,19 @@ async function publishSharedState(room: string, state: NoboriState) {
     ok?: boolean;
     state?: unknown;
     updatedAt?: string;
+    history?: ChangeLogEntry[];
   };
 }
 
 async function publishSharedPatch(
   room: string,
   patch: StatePatchOperation[],
+  actor: string,
 ) {
-  const response = await fetch(stateApiUrl(room), {
+  const response = await fetch(stateApiUrl(room, undefined, true), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ patch }),
+    body: JSON.stringify({ patch, actor }),
     cache: "no-store",
   });
 
@@ -1041,6 +1062,7 @@ async function publishSharedPatch(
     ok?: boolean;
     state?: unknown;
     updatedAt?: string;
+    history?: ChangeLogEntry[];
   };
 }
 
@@ -1050,6 +1072,10 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
   );
   const [ready, setReady] = useState(false);
   const [sharedSync, setSharedSync] = useState<SharedSyncStatus>("checking");
+  const [actorName, setInternalActorName] = useState("");
+  const [history, setHistory] = useState<ChangeLogEntry[]>([]);
+  const actorRef = useRef("");
+  const fallbackActorRef = useRef("");
   const channelRef = useRef<BroadcastChannel | null>(null);
   const lastSerializedRef = useRef("");
   const pendingBroadcastRef = useRef<{
@@ -1081,6 +1107,19 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     const storageKey = roomStorageKey(room);
     roomRef.current = room;
 
+    if (role === "control") {
+      fallbackActorRef.current = `端末 ${crypto.randomUUID().slice(0, 8)}`;
+      let actor = fallbackActorRef.current;
+      try {
+        actor = window.localStorage.getItem(ACTOR_STORAGE_KEY) || actor;
+        window.localStorage.setItem(ACTOR_STORAGE_KEY, actor);
+      } catch {
+        // 保存が拒否された場合も、このページ内では端末名で識別する。
+      }
+      actorRef.current = actor;
+      setInternalActorName(actor);
+    }
+
     try {
       const stored =
         window.localStorage.getItem(storageKey) ??
@@ -1100,8 +1139,9 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     }
 
     if (role === "control") {
-      fetchSharedState(roomRef.current, abortController.signal)
+      fetchSharedState(roomRef.current, abortController.signal, undefined, true)
         .then((payload) => {
+          if (payload.history) setHistory(payload.history);
           setSharedSync(payload.configured ? "connected" : "local");
           sharedUpdatedAtRef.current = payload.updatedAt ?? "";
           if (payload.state) {
@@ -1112,8 +1152,9 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
           }
 
           if (payload.configured) {
-            void publishSharedState(roomRef.current, hydratedState).then(
+            void publishSharedState(roomRef.current, hydratedState, actorRef.current, "initialize").then(
               (published) => {
+                if (published.history) setHistory(published.history);
                 if (!published.state) return;
                 const publishedState = normalizeState(
                   published.state as Partial<NoboriState>,
@@ -1202,8 +1243,10 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
           roomRef.current,
           abortController.signal,
           sharedUpdatedAtRef.current,
+          role === "control",
         );
         if (!active) return;
+        if (payload.history) setHistory(payload.history);
         setSharedSync(payload.configured ? "connected" : "local");
         sharedUpdatedAtRef.current = payload.updatedAt ?? "";
         if (payload.state) {
@@ -1298,7 +1341,8 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
             const patch = createStatePatch(base, localState);
             if (patch.length === 0) return;
 
-            const payload = await publishSharedPatch(roomRef.current, patch);
+            const payload = await publishSharedPatch(roomRef.current, patch, actorRef.current);
+            if (payload.history) setHistory(payload.history);
             setSharedSync(payload.configured ? "connected" : "local");
             if (!payload.state) return;
 
@@ -1361,8 +1405,9 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
       source: sourceId,
     });
     if (role === "control") {
-      publishSharedState(roomRef.current, reset)
+      publishSharedState(roomRef.current, reset, actorRef.current, "reset")
         .then((payload) => {
+          if (payload.history) setHistory(payload.history);
           setSharedSync(payload.configured ? "connected" : "local");
           if (!payload.state) return;
           sharedUpdatedAtRef.current = payload.updatedAt ?? "";
@@ -1374,7 +1419,18 @@ function useNoboriState({ role = "control" }: { role?: SyncRole } = {}): StateBu
     }
   }, [role, sourceId]);
 
-  return { state, setState, resetState, ready, sharedSync };
+  const setActorName = useCallback((name: string) => {
+    const next = name.slice(0, 40);
+    setInternalActorName(next);
+    actorRef.current = next.trim() || fallbackActorRef.current;
+    try {
+      window.localStorage.setItem(ACTOR_STORAGE_KEY, actorRef.current);
+    } catch {
+      // 操作名の保存が拒否されても変更操作は続けられる。
+    }
+  }, []);
+
+  return { state, setState, resetState, ready, sharedSync, actorName, setActorName, history };
 }
 
 function getMaxMaps(format: Format) {
@@ -1590,7 +1646,7 @@ function ScoreStepper({
 }
 
 function AdminPage() {
-  const { state, setState, resetState, ready, sharedSync } = useNoboriState({
+  const { state, setState, resetState, ready, sharedSync, actorName, setActorName, history } = useNoboriState({
     role: "control",
   });
   const [adminTab, setAdminTab] = useState<"match" | "maps" | "roster" | "ban">(
@@ -1840,6 +1896,38 @@ function AdminPage() {
             : "同期準備中"}
         </div>
       </header>
+
+      <div className="operator-bar">
+        <Field label="操作名">
+          <input
+            value={actorName}
+            maxLength={40}
+            onChange={(event) => setActorName(event.target.value)}
+          />
+        </Field>
+        <details className="change-history">
+          <summary>変更履歴（直近10件）</summary>
+          {history.length === 0 ? (
+            <p>履歴はありません</p>
+          ) : (
+            <ol>
+              {history.map((entry) => (
+                <li key={entry.id}>
+                  <time dateTime={entry.at}>
+                    {new Date(entry.at).toLocaleString("ja-JP", {
+                      timeZone: "Asia/Tokyo",
+                      month: "2-digit", day: "2-digit",
+                      hour: "2-digit", minute: "2-digit", second: "2-digit",
+                    })}
+                  </time>
+                  <strong>{entry.actor}</strong>
+                  <span>{entry.action === "reset" ? "全初期化" : "変更"}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </details>
+      </div>
 
       <div className="admin-grid">
         <div className="control-panel">

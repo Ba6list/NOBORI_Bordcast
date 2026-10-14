@@ -168,6 +168,66 @@ code {
   min-width: 0;
 }
 
+.operator-bar {
+  max-width: 1680px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.operator-bar > .field {
+  width: 240px;
+  max-width: 100%;
+}
+
+.change-history {
+  flex: 1 1 320px;
+  min-width: 0;
+  padding: 12px 0;
+}
+
+.change-history summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.change-history ol {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.change-history li {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr) 70px;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  font-size: 0.85rem;
+}
+
+.change-history strong {
+  overflow-wrap: anywhere;
+}
+
+.change-history time,
+.change-history li span,
+.change-history p {
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .change-history li {
+    grid-template-columns: minmax(0, 1fr) 70px;
+  }
+
+  .change-history time {
+    grid-column: 1 / -1;
+  }
+}
+
 .preview-panel {
   position: sticky;
   top: 24px;

@@ -1,6 +1,16 @@
 export const dynamic = "force-dynamic";
 
 const KEY_PREFIX = "nobori:broadcast-state";
+const APPEND_HISTORY_SCRIPT = `
+local history = stored.history or {}
+if ARGV[3] ~= "" then
+  table.insert(history, 1, cjson.decode(ARGV[3]))
+end
+while #history > 10 do
+  table.remove(history)
+end
+stored.history = history
+`;
 const APPLY_PATCH_SCRIPT = `
 local raw = redis.call("GET", KEYS[1])
 if not raw then
@@ -35,10 +45,32 @@ end
 
 stored.state = state
 stored.updatedAt = ARGV[2]
+${APPEND_HISTORY_SCRIPT}
 local encoded = cjson.encode(stored)
 redis.call("SET", KEYS[1], encoded)
 return encoded
 `;
+const REPLACE_STATE_SCRIPT = `
+local raw = redis.call("GET", KEYS[1])
+local stored = raw and cjson.decode(raw) or {}
+stored.state = cjson.decode(ARGV[1])
+stored.updatedAt = ARGV[2]
+${APPEND_HISTORY_SCRIPT}
+local encoded = cjson.encode(stored)
+redis.call("SET", KEYS[1], encoded)
+return encoded
+`;
+
+type StoredState = {
+  state?: unknown;
+  updatedAt?: string;
+  history?: unknown;
+};
+
+function historyResponse(request: Request, stored: StoredState) {
+  if (new URL(request.url).searchParams.get("history") !== "1") return {};
+  return { history: Array.isArray(stored.history) ? stored.history.slice(0, 10) : [] };
+}
 
 type PatchOperation = {
   path: (string | number)[];
@@ -148,7 +180,7 @@ export async function GET(request: Request) {
       return responseJson({ configured: true, state: null, updatedAt: null });
     }
 
-    const stored = JSON.parse(result) as { state?: unknown; updatedAt?: string };
+    const stored = JSON.parse(result) as StoredState;
     const requestedUpdatedAt = new URL(request.url).searchParams.get("since");
 
     if (requestedUpdatedAt && requestedUpdatedAt === stored.updatedAt) {
@@ -165,6 +197,7 @@ export async function GET(request: Request) {
       state: stored.state ?? null,
       updatedAt: stored.updatedAt ?? null,
       unchanged: false,
+      ...historyResponse(request, stored),
     });
   } catch (error) {
     return responseJson(
@@ -183,8 +216,19 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       state?: unknown;
       patch?: unknown;
+      actor?: unknown;
+      action?: unknown;
     };
     const updatedAt = `${new Date().toISOString()}-${crypto.randomUUID()}`;
+    const actor = typeof body.actor === "string"
+      ? body.actor.trim().slice(0, 40) || "名前未設定"
+      : "名前未設定";
+    const entry = body.action === "initialize" ? "" : JSON.stringify({
+      id: updatedAt,
+      actor,
+      at: new Date().toISOString(),
+      action: body.action === "reset" ? "reset" : "change",
+    });
 
     if (Array.isArray(body.patch)) {
       if (
@@ -205,6 +249,7 @@ export async function POST(request: Request) {
         roomKey(request),
         JSON.stringify(body.patch),
         updatedAt,
+        entry,
       ]);
 
       if (!configured) {
@@ -218,12 +263,13 @@ export async function POST(request: Request) {
         );
       }
 
-      const stored = JSON.parse(result) as { state?: unknown; updatedAt?: string };
+      const stored = JSON.parse(result) as StoredState;
       return responseJson({
         configured: true,
         ok: true,
         state: stored.state ?? null,
         updatedAt: stored.updatedAt ?? updatedAt,
+        ...historyResponse(request, stored),
       });
     }
 
@@ -234,22 +280,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const serialized = JSON.stringify({ state: body.state, updatedAt });
-    const { configured } = await redisCommand<string>([
-      "SET",
+    const { configured, result } = await redisCommand<string>([
+      "EVAL",
+      REPLACE_STATE_SCRIPT,
+      1,
       roomKey(request),
-      serialized,
+      JSON.stringify(body.state),
+      updatedAt,
+      entry,
     ]);
 
     if (!configured) {
       return responseJson({ configured: false, ok: false });
     }
 
+    const stored = JSON.parse(result!) as StoredState;
     return responseJson({
       configured: true,
       ok: true,
       state: body.state,
       updatedAt,
+      ...historyResponse(request, stored),
     });
   } catch (error) {
     return responseJson(
