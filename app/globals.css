@@ -1547,8 +1547,8 @@ code {
 }
 
 .map-winner-badge {
-  --winner-logo-width: 104px;
-  --winner-logo-height: 104px;
+  --winner-logo-width: 130px;
+  --winner-logo-height: 130px;
 
   position: absolute;
   top: 50%;
@@ -1585,8 +1585,8 @@ code {
 }
 
 .maps-7 .map-winner-badge {
-  --winner-logo-width: 82px;
-  --winner-logo-height: 82px;
+  --winner-logo-width: 104px;
+  --winner-logo-height: 104px;
 }
 
 .maps-7 .map-winner-logo {
