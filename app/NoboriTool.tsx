@@ -17,6 +17,7 @@ import {
   createStatePatch,
   type StatePatchOperation,
 } from "./statePatch";
+import { ConfirmedTextInput } from "./ConfirmedTextInput";
 
 type SceneView = "map" | "roster" | "ban";
 type Format = "FT3" | "FT4";
@@ -1998,23 +1999,23 @@ function AdminPage() {
               <Section title="試合設定" eyebrow="MATCH">
                 <div className="form-grid two">
                   <Field label="大会名">
-                    <input
+                    <ConfirmedTextInput
                       value={state.matchTitle}
-                      onChange={(event) =>
+                      onCommit={(value) =>
                         setState((previous) => ({
                           ...previous,
-                          matchTitle: event.target.value,
+                          matchTitle: value,
                         }))
                       }
                     />
                   </Field>
                   <Field label="ラウンド">
-                    <input
+                    <ConfirmedTextInput
                       value={state.roundName}
-                      onChange={(event) =>
+                      onCommit={(value) =>
                         setState((previous) => ({
                           ...previous,
-                          roundName: event.target.value,
+                          roundName: value,
                         }))
                       }
                     />
@@ -2052,12 +2053,12 @@ function AdminPage() {
                   label="背景画像URL"
                   hint="添付KVを使う場合は public/assets に置いて /assets/ファイル名 を指定してください"
                 >
-                  <input
+                  <ConfirmedTextInput
                     value={usesLocalBackground ? "" : state.backgroundUrl}
-                    onChange={(event) =>
+                    onCommit={(value) =>
                       setState((previous) => ({
                         ...previous,
-                        backgroundUrl: event.target.value,
+                        backgroundUrl: value,
                       }))
                     }
                     placeholder={
@@ -2124,24 +2125,16 @@ function AdminPage() {
                     />
                   </Field>
                   <Field label="カラーコード" hint="例: #ffffff">
-                    <input
+                    <ConfirmedTextInput
                       value={state.otherLineColor}
                       disabled={state.lineColorMode !== "others"}
                       pattern="^#[0-9A-Fa-f]{6}$"
                       maxLength={7}
-                      onChange={(event) =>
+                      onCommit={(value) =>
                         setState((previous) => ({
                           ...previous,
-                          otherLineColor: event.target.value,
-                        }))
-                      }
-                      onBlur={() =>
-                        setState((previous) => ({
-                          ...previous,
-                          otherLineColor: /^#[0-9a-f]{6}$/i.test(
-                            previous.otherLineColor,
-                          )
-                            ? previous.otherLineColor.toLowerCase()
+                          otherLineColor: /^#[0-9a-f]{6}$/i.test(value)
+                            ? value.toLowerCase()
                             : DEFAULT_OTHER_LINE_COLOR,
                         }))
                       }
@@ -2241,19 +2234,19 @@ function AdminPage() {
                           </select>
                         </Field>
                         <Field label="チーム名">
-                          <input
+                          <ConfirmedTextInput
                             value={state.teams[side].name}
-                            onChange={(event) =>
-                              updateTeam(side, { name: event.target.value })
+                            onCommit={(value) =>
+                              updateTeam(side, { name: value })
                             }
                           />
                         </Field>
                         <div className="form-grid two">
                           <Field label="シード">
-                            <input
+                            <ConfirmedTextInput
                               value={state.teams[side].seed}
-                              onChange={(event) =>
-                                updateTeam(side, { seed: event.target.value })
+                              onCommit={(value) =>
+                                updateTeam(side, { seed: value })
                               }
                             />
                           </Field>
@@ -2271,10 +2264,10 @@ function AdminPage() {
                           </Field>
                         </div>
                         <Field label="ロゴURL">
-                          <input
+                          <ConfirmedTextInput
                             value={usesLocalLogo ? "" : state.teams[side].logoUrl}
-                            onChange={(event) =>
-                              updateTeam(side, { logoUrl: event.target.value })
+                            onCommit={(value) =>
+                              updateTeam(side, { logoUrl: value })
                             }
                             placeholder={
                               usesLocalLogo
@@ -2547,11 +2540,11 @@ function AdminPage() {
                           </select>
                         </Field>
                         <Field label="画像URL">
-                          <input
+                          <ConfirmedTextInput
                             value={map.imageUrl}
                             disabled={!isMapSelected(map)}
-                            onChange={(event) =>
-                              updateMap(index, { imageUrl: event.target.value })
+                            onCommit={(value) =>
+                              updateMap(index, { imageUrl: value })
                             }
                             placeholder="/assets/map-01.png"
                           />
@@ -2574,12 +2567,12 @@ function AdminPage() {
                       {state.teams[side].roster.map((player, index) => (
                         <div className="player-editor" key={`${side}-${index}`}>
                           <span>{index + 1}</span>
-                          <input
+                          <ConfirmedTextInput
                             aria-label={`${side} player ${index + 1} name`}
                             value={player.name}
-                            onChange={(event) =>
+                            onCommit={(value) =>
                               updateRoster(side, index, {
-                                name: event.target.value,
+                                name: value,
                               })
                             }
                           />
@@ -2621,14 +2614,14 @@ function AdminPage() {
                               })
                             }
                           />
-                          <input
+                          <ConfirmedTextInput
                             aria-label={`${side} player ${index + 1} image`}
                             value={player.imageUrl}
-                            onChange={(event) => {
-                              const hero = findHeroPresetByImageUrl(event.target.value);
+                            onCommit={(value) => {
+                              const hero = findHeroPresetByImageUrl(value);
 
                               updateRoster(side, index, {
-                                imageUrl: event.target.value,
+                                imageUrl: value,
                                 favoriteHero: hero?.name ?? "",
                               });
                             }}
@@ -2716,12 +2709,12 @@ function AdminPage() {
                                     })
                                   }
                                 />
-                                <input
+                                <ConfirmedTextInput
                                   aria-label={`map ${index + 1} ${phase} ban image`}
                                   value={pick.heroImageUrl}
-                                  onChange={(event) =>
+                                  onCommit={(value) =>
                                     updateMapBan(index, phase, {
-                                      heroImageUrl: event.target.value,
+                                      heroImageUrl: value,
                                     })
                                   }
                                   placeholder="ヒーロー画像URL"
