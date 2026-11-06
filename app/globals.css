@@ -528,6 +528,17 @@ code {
   color: #dff9ff;
 }
 
+.team-archive summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.team-archive[open] summary {
+  margin-bottom: 12px;
+}
+
 .logo-adjust-panel {
   display: grid;
   gap: 11px;

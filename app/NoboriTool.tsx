@@ -206,28 +206,50 @@ const n1TeamLogoFiles = [
 
 const n1TeamLogoFileSet = new Set<string>(n1TeamLogoFiles);
 
-function makeTeamLogoPreset(fileName: string) {
+function makeTeamLogoPreset(fileName: string, directory = TEAM_LOGO_DIR) {
   return {
     fileName,
     name: teamNameFromLogoFile(fileName),
-    logoUrl: `${TEAM_LOGO_DIR}/${fileName}`,
+    logoUrl: `${directory}/${fileName}`,
   };
 }
 
-const teamLogoGroups = [
+const season1TeamLogoGroups = [
   {
     label: "N1",
-    presets: n1TeamLogoFiles.map(makeTeamLogoPreset),
+    presets: n1TeamLogoFiles.map((fileName) => makeTeamLogoPreset(fileName)),
   },
   {
     label: "N2",
     presets: teamLogoFiles
       .filter((fileName) => !n1TeamLogoFileSet.has(fileName))
-      .map(makeTeamLogoPreset),
+      .map((fileName) => makeTeamLogoPreset(fileName)),
   },
 ];
 
-const teamLogoPresets = teamLogoGroups.flatMap((group) => group.presets);
+const season2TeamLogoGroups = [
+  {
+    label: "N1",
+    files: ["AERIX.png", "Gracesblaze.png", "Pomeranians.png", "Telomere.png", "VarrelYouth.png", "腹2.png"],
+  },
+  {
+    label: "N2A",
+    files: ["AIMCORE.png", "BlessUnion.png", "Ragestar.png", "TelomereAC.png", "TheRapid.png", "TwiceAgain.png"],
+  },
+  {
+    label: "N2B",
+    files: ["AriseYouth.png", "Dongrees.png", "Dostoevsky.png", "OECU.png", "PlatinumStuck.png", "Whiteラムネ.png"],
+  },
+].map(({ label, files }) => ({
+  label,
+  presets: files.map((fileName) =>
+    makeTeamLogoPreset(fileName, `${TEAM_LOGO_DIR}/season2/${label}`),
+  ),
+}));
+
+const season1TeamLogoPresets = season1TeamLogoGroups.flatMap((group) => group.presets);
+const season2TeamLogoPresets = season2TeamLogoGroups.flatMap((group) => group.presets);
+const teamLogoPresets = [...season2TeamLogoPresets, ...season1TeamLogoPresets];
 
 async function localImageDataUrl(
   file: File,
@@ -2170,6 +2192,9 @@ function AdminPage() {
               <Section title="チーム情報" eyebrow="TEAMS">
                 <div className="team-edit-grid">
                   {(["left", "right"] as Side[]).map((side) => {
+                    const selectedSeason1Preset = season1TeamLogoPresets.find(
+                      (preset) => preset.logoUrl === state.teams[side].logoUrl,
+                    );
                     const selectedTeamPreset =
                       teamLogoPresets.find(
                         (preset) =>
@@ -2178,6 +2203,24 @@ function AdminPage() {
                     const usesLocalLogo = state.teams[side].logoUrl.startsWith(
                       "data:image/",
                     );
+                    const selectTeamPreset = (logoUrl: string) => {
+                      if (!logoUrl) {
+                        updateTeam(side, {
+                          logoUrl: "",
+                          logoAdjust: DEFAULT_LOGO_ADJUST,
+                        });
+                        setLogoUploadErrors((previous) => ({ ...previous, [side]: "" }));
+                        return;
+                      }
+
+                      const preset = teamLogoPresets.find((team) => team.logoUrl === logoUrl);
+                      if (!preset) return;
+                      updateTeam(side, {
+                        name: preset.name,
+                        logoUrl: preset.logoUrl,
+                        logoAdjust: DEFAULT_LOGO_ADJUST,
+                      });
+                    };
 
                     return (
                       <div className="team-editor" key={side}>
@@ -2189,40 +2232,16 @@ function AdminPage() {
                           />
                           <strong>{sideLabels[side]}</strong>
                         </div>
-                        <Field label="登録チーム">
+                        <Field label="登録チーム（Season2）">
                           <select
-                            value={selectedTeamPreset}
-                            onChange={(event) => {
-                              if (!event.target.value) {
-                                updateTeam(side, {
-                                  logoUrl: "",
-                                  logoAdjust: DEFAULT_LOGO_ADJUST,
-                                });
-                                setLogoUploadErrors((previous) => ({
-                                  ...previous,
-                                  [side]: "",
-                                }));
-                                return;
-                              }
-
-                              const preset = teamLogoPresets.find(
-                                (teamPreset) =>
-                                  teamPreset.logoUrl === event.target.value,
-                              );
-
-                              if (!preset) {
-                                return;
-                              }
-
-                              updateTeam(side, {
-                                name: preset.name,
-                                logoUrl: preset.logoUrl,
-                                logoAdjust: DEFAULT_LOGO_ADJUST,
-                              });
-                            }}
+                            value={selectedSeason1Preset ? "season1" : selectedTeamPreset}
+                            onChange={(event) => selectTeamPreset(event.target.value)}
                           >
                             <option value="">手入力</option>
-                            {teamLogoGroups.map((group) => (
+                            {selectedSeason1Preset ? (
+                              <option value="season1" disabled>Season1を選択中</option>
+                            ) : null}
+                            {season2TeamLogoGroups.map((group) => (
                               <optgroup key={group.label} label={group.label}>
                                 {group.presets.map((preset) => (
                                   <option key={preset.logoUrl} value={preset.logoUrl}>
@@ -2233,6 +2252,26 @@ function AdminPage() {
                             ))}
                           </select>
                         </Field>
+                        <details className="team-archive" open={Boolean(selectedSeason1Preset)}>
+                          <summary>Season1</summary>
+                          <Field label="登録チーム（Season1）">
+                            <select
+                              value={selectedSeason1Preset?.logoUrl ?? ""}
+                              onChange={(event) => selectTeamPreset(event.target.value)}
+                            >
+                              <option value="" disabled>チームを選択</option>
+                              {season1TeamLogoGroups.map((group) => (
+                                <optgroup key={group.label} label={group.label}>
+                                  {group.presets.map((preset) => (
+                                    <option key={preset.logoUrl} value={preset.logoUrl}>
+                                      {preset.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </Field>
+                        </details>
                         <Field label="チーム名">
                           <ConfirmedTextInput
                             value={state.teams[side].name}

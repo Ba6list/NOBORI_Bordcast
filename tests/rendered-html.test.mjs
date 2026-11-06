@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -46,6 +47,37 @@ test("server-renders registered team logo presets", async () => {
   assert.match(html, /U\.M\.A Seekers/);
   assert.match(html, /Killer-Bee/);
   assert.match(html, /\/assets\/team-logos\/U\.M\.A_Seekers\.png/);
+
+  const selects = [...html.matchAll(/<select\b[^>]*>[\s\S]*?<\/select>/g)]
+    .map((match) => match[0]);
+  const current = selects.filter((select) => select.includes("/team-logos/season2/"));
+  const archived = selects.filter((select) =>
+    select.includes("/team-logos/") && !select.includes("/team-logos/season2/"),
+  );
+  assert.equal(current.length, 2);
+  assert.equal(archived.length, 2);
+  for (const select of current) {
+    assert.equal([...select.matchAll(/<option\b/g)].length, 19);
+    for (const group of ["N1", "N2A", "N2B"]) {
+      const options = select.match(new RegExp(`<optgroup label="${group}">([\\s\\S]*?)</optgroup>`));
+      assert(options);
+      assert.equal([...options[1].matchAll(/<option\b/g)].length, 6);
+    }
+    assert.doesNotMatch(select, /Konamono Gaming|U\.M\.A Seekers|Killer-Bee/);
+  }
+  for (const select of archived) {
+    assert.equal([...select.matchAll(/<option\b/g)].length, 17);
+    assert.match(select, /Konamono Gaming/);
+    assert.doesNotMatch(select, /Pomeranians|TwiceAgain|Whiteラムネ/);
+  }
+  const logoPaths = [...current[0].matchAll(/value="(\/assets\/team-logos\/season2\/[^\"]+)"/g)]
+    .map((match) => match[1]);
+  assert.equal(logoPaths.length, 18);
+  for (const logoPath of logoPaths) {
+    const image = await readFile(new URL(`../public${logoPath}`, import.meta.url));
+    assert.equal(image.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", logoPath);
+    assert(image.readUInt32BE(16) > 0 && image.readUInt32BE(20) > 0, logoPath);
+  }
 });
 
 test("server-renders each OBS overlay route", async () => {
